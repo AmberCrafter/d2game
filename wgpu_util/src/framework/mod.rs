@@ -1,0 +1,219 @@
+mod logger;
+
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+use log::{debug, error, info};
+use winit::{
+    application::ApplicationHandler,
+    dpi::{PhysicalPosition, PhysicalSize},
+    event::{
+        DeviceEvent, ElementState, KeyEvent, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent,
+    },
+    event_loop::EventLoop,
+    window::Window,
+};
+
+#[allow(unused)]
+pub trait WgpuAppAction {
+    fn new(window: Arc<Window>) -> impl core::future::Future<Output = Self>;
+    // fn new(window: Arc<Window>) -> Self;
+    fn set_window_resized(&mut self, size: PhysicalSize<u32>);
+    fn get_size(&self) -> PhysicalSize<u32>;
+
+    // input operation
+    fn keyboard_input(&mut self, event: &KeyEvent, is_synthetic: bool) -> bool {
+        false
+    }
+    fn mouse_click(&mut self, state: ElementState, button: MouseButton) -> bool {
+        false
+    }
+    fn mouse_wheel(&mut self, delta: MouseScrollDelta, phase: TouchPhase) -> bool {
+        false
+    }
+    fn cursor_move(&mut self, position: PhysicalPosition<f64>) -> bool {
+        false
+    }
+    fn device_input(&mut self, event: DeviceEvent) -> bool {
+        false
+    }
+
+    // state operation
+    fn update(&mut self, dt: Duration) {}
+    fn render(&mut self) -> Result<(), wgpu::SurfaceError>;
+}
+
+#[allow(unused)]
+struct WgpuAppHandler<A: WgpuAppAction> {
+    title: String,
+    window: Option<Arc<Window>>,
+    app: Arc<Mutex<Option<A>>>,
+    last_render_time: std::time::Instant,
+}
+
+#[allow(unused)]
+impl<A: WgpuAppAction> WgpuAppHandler<A> {
+    fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            window: None,
+            app: Arc::new(Mutex::new(None)),
+            last_render_time: std::time::Instant::now(),
+        }
+    }
+
+    fn config_window(&mut self, window: Arc<Window>) {
+        self.window.replace(window);
+    }
+
+    fn pre_present_notify(&self) {
+        if let Some(window) = self.window.as_ref() {
+            window.pre_present_notify();
+        }
+    }
+
+    fn request_redraw(&self) {
+        if let Some(window) = self.window.as_ref() {
+            window.request_redraw();
+        }
+    }
+}
+
+#[allow(unused)]
+// Implement winit eventloop trait
+impl<A: WgpuAppAction> ApplicationHandler for WgpuAppHandler<A> {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let Ok(mut app) = self.app.as_ref().lock() else {
+            error!("System Error");
+            return;
+        };
+
+        if app.is_some() {
+            return;
+        }
+
+        self.last_render_time = std::time::Instant::now();
+        let window_attrs = Window::default_attributes();
+        let Ok(window) = event_loop.create_window(window_attrs) else {
+            error!("System Error");
+            return;
+        };
+        let window = Arc::new(window);
+
+        // setup async runtime
+        let Ok(rt) = tokio::runtime::Runtime::new() else {
+            error!("System Error");
+            return;
+        };
+
+        let wgpu_app = rt.block_on(A::new(window.clone()));
+        // let wgpu_app = A::new(window.clone());
+        app.replace(wgpu_app);
+        drop(app);
+
+        self.config_window(window.clone());
+    }
+
+    fn suspended(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let Ok(mut app) = self.app.as_ref().lock() else {
+            error!("System Error");
+            return;
+        };
+        app.take();
+        self.window.take();
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        let Ok(mut app) = self.app.lock() else {
+            error!("System Error");
+            return;
+        };
+
+        let Some(app) = app.as_mut() else {
+            error!("System Error");
+            return;
+        };
+
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            }
+            WindowEvent::Resized(physical_size) => {
+                if physical_size.width == 0 || physical_size.height == 0 {
+                    info!("Window minimized!");
+                } else {
+                    info!("Window resize: {:?}", physical_size);
+                    app.set_window_resized(physical_size);
+                }
+            }
+            WindowEvent::MouseInput {
+                device_id,
+                state,
+                button,
+            } => {
+                app.mouse_click(state, button);
+            }
+            WindowEvent::MouseWheel {
+                device_id,
+                delta,
+                phase,
+            } => {
+                app.mouse_wheel(delta, phase);
+            }
+            WindowEvent::CursorMoved {
+                device_id,
+                position,
+            } => {
+                app.cursor_move(position);
+            }
+            WindowEvent::KeyboardInput {
+                device_id,
+                event,
+                is_synthetic,
+            } => {
+                app.keyboard_input(&event, is_synthetic);
+            }
+            WindowEvent::RedrawRequested => {
+                let now = std::time::Instant::now();
+                let dt = now - self.last_render_time;
+                self.last_render_time = now;
+
+                app.update(dt);
+                self.pre_present_notify();
+
+                match app.render() {
+                    Ok(_) => {}
+                    Err(wgpu::SurfaceError::Lost) => {
+                        error!("System error: Surface is lost.");
+                        eprintln!("System error: Surface is lost.");
+                    }
+                    Err(e) => {
+                        error!("System error: {:?}.", e);
+                        eprintln!("System error: {:?}.", e);
+                    }
+                }
+
+                self.request_redraw();
+            }
+            e => {
+                debug!("Todo: {e:?}!")
+            }
+        }
+    }
+}
+
+#[allow(unused)]
+pub fn run<A: WgpuAppAction>(title: &str) -> anyhow::Result<()> {
+    logger::init_logger();
+    let event_loop = EventLoop::new()?;
+    let mut app = WgpuAppHandler::<A>::new(title);
+    let _ = event_loop.run_app(&mut app);
+    Ok(())
+}
