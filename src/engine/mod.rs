@@ -1,3 +1,5 @@
+mod background;
+
 use std::{
     collections::HashMap,
     ops::Range,
@@ -12,6 +14,7 @@ use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::{
     camera::{CameraConfig, CameraInfo},
+    engine::background::load_background,
     instance::Instance,
     model::{DrawModel, Model, ModelVertex},
     render_pipeline::RenderPipelineInfo,
@@ -22,7 +25,7 @@ use crate::{
 };
 
 pub enum UserDataType {
-    Model(Arc<Model>, Range<u32>),
+    Model(Arc<Model>, Arc<wgpu::Buffer>),
     ModelInstance(Arc<Model>, Range<u32>, Arc<wgpu::Buffer>),
 }
 
@@ -137,7 +140,7 @@ impl WgpuAppAction for WgpuApp {
         // y: screen top
         // z: out of screen (to user)
         let camera_config = CameraConfig {
-            eye: (f32::EPSILON, 0.0, 50.0).into(),
+            eye: (f32::EPSILON, 0.0, 30.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3 {
                 x: 0.0,
@@ -221,14 +224,17 @@ impl WgpuAppAction for WgpuApp {
 
     fn update(&mut self, _dt: std::time::Duration) {
         if self.update_user_data {
+            load_background(&self);
             load_resource(&self);
             self.update_user_data = false;
         }
 
         self.camera.update();
-        self.app_surface
-            .queue
-            .write_buffer(self.camera.buffer.as_ref().unwrap(), 0, self.camera.uniform.as_bytes());
+        self.app_surface.queue.write_buffer(
+            self.camera.buffer.as_ref().unwrap(),
+            0,
+            self.camera.uniform.as_bytes(),
+        );
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -280,10 +286,10 @@ impl WgpuAppAction for WgpuApp {
             for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
                 for data in datas {
                     match data {
-                        UserDataType::Model(model, instances) => {
-                            render_pass.draw_model_instanced(
+                        UserDataType::Model(model, instance_buffer) => {
+                            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+                            render_pass.draw_model(
                                 model,
-                                instances.clone(),
                                 self.camera.bind_group.as_ref().unwrap(),
                             );
                         }

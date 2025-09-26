@@ -40,7 +40,7 @@ impl AppSurface {
         let (device, queue) = adapter
             .request_device(&wgpu::wgt::DeviceDescriptor {
                 label: Some("App Gpu device"),
-                required_features: wgpu::Features::empty(),
+                required_features: wgpu::Features::VERTEX_WRITABLE_STORAGE,
                 required_limits: wgpu::Limits::defaults(),
                 memory_hints: wgpu::MemoryHints::Performance,
                 trace: wgpu::Trace::Off,
