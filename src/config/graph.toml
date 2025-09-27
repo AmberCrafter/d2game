@@ -1,0 +1,54 @@
+version = "1.0.0"
+name = "MyGame grapher"
+
+[resources]
+[resources.shaders.backgound]
+filename = "backgound.wgsl"
+vertex_entry = "vs_main"
+fragment_entry = "fs_main"
+
+[resources.shaders.item]
+filename = "item.wgsl"
+vertex_entry = "vs_main"
+fragment_entry = "fs_main"
+
+[resources.vertexbuffers.vertex]
+layouts = [
+    { location = 0, format = "Float32x3" },
+    { location = 1, format = "Float32x2" },
+    { location = 2, format = "Float32x3" },
+]
+usgae = ["VERTEX"]
+
+[resources.vertexbuffers.instance]
+layouts = [
+    { location = 5, format = "Float32x4" },
+    { location = 6, format = "Float32x4" },
+    { location = 7, format = "Float32x4" },
+    { location = 8, format = "Float32x4" },
+]
+usgae = ["INDEX"]
+
+[resources.bindgroups.camera]
+entries = [{ binding = 0, ty = "Uniform", Visibility = "Vertex" }]
+usgae = ["UNIFORM", "COPY_DST"]
+
+[resources.bindgroups.texture]
+entries = [
+    { binding = 0, ty = "Texture", Visibility = "Fragment" },
+    { binding = 1, ty = "Sampler", Visibility = "Fragment" },
+]
+usgae = ["UNIFORM", "COPY_DST"]
+
+[pipelines]
+[pipelines.backgound]
+shader = "backgound"
+depth_texture = true
+vertex_buffer_layouts = ["vertex"]
+bind_group_layout = "texture"
+
+[pipelines.item]
+shader = "item"
+depth_texture = true
+vertex_buffer_layouts = ["vertex", "instance"]
+bind_group_layout = "texture"

@@ -6,6 +6,7 @@ pub mod resource;
 pub mod shader;
 pub mod texture;
 pub mod vertex;
+pub mod config;
 
 use std::{
     collections::HashMap,

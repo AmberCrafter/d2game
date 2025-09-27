@@ -22,9 +22,6 @@ struct CameraUniform {
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
 
-// @group(2) @binding(0)
-// var<storage, read_write> debug_storage: mat4x4f;
-
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -37,23 +34,20 @@ fn vs_main(
         instance.model_matrix_3,
     );
 
-    // debug_storage = mat4x4f(
-    //     vec4f(1.0, 2.0, 3.0, 4.0),
-    //     vec4f(model.position, 1.0),
-    //     vec4f(model.position, 1.0),
-    //     vec4f(model.position, 1.0),
-    // );
-
     var out: VertexOutput;
     out.tex_coords = model.tex_coords;
     out.clip_position = camera.view_proj * model_matrix * vec4f(model.position, 1.0);
+    // out.clip_position = camera.view_proj * vec4f(model.position, 1.0);
     return out;
+}
 
-    out.clip_position = camera.view_proj * vec4f(model.position.x, model.position.y, model.position.z, 1.0);
-    // out.clip_position = camera.view_proj * vec4f(model.position.x, model.position.y, model.position.z, 1.0);
-    return out;
 
-    // var out: VertexOutput;
-    // out.clip_position = vec4f(model, 0.0, 0.0, 1.0);
-    // return out;
+@group(0) @binding(0)
+var t_diffuse: texture_2d<f32>;
+@group(0) @binding(1)
+var s_diffuse: sampler;
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    return textureSample(t_diffuse, s_diffuse, in.tex_coords);
 }
