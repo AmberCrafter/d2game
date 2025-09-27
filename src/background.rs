@@ -3,8 +3,8 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Rotation3};
 use wgpu::util::DeviceExt;
 
-use crate::{
-    engine::{UserDataType, WgpuApp},
+use crate::engine::{
+    UserDataType, WgpuApp,
     instance::Instance,
     model::{Material, Mesh, Model, ModelVertex},
     resource::load_texture,

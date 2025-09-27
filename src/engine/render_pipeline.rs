@@ -1,4 +1,4 @@
-use crate::{shader::ShaderInfo, texture::Texture};
+use crate::engine::{shader::ShaderInfo, texture::Texture};
 
 pub struct RenderPipelineInfo /*<'a, 'b>*/ {
     // bind_grop_layouts: Vec<&'a wgpu::BindGroupLayout>,

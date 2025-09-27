@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::vertex::Vertex;
+use crate::engine::vertex::Vertex;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -39,7 +39,7 @@ impl Vertex for ModelVertex {
 #[allow(unused)]
 pub struct Material {
     pub name: String,
-    pub diffuse_texture: crate::texture::Texture,
+    pub diffuse_texture: crate::engine::texture::Texture,
     pub bind_group: wgpu::BindGroup,
 }
 

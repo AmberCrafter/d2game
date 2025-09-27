@@ -1,4 +1,11 @@
-mod background;
+pub mod camera;
+pub mod instance;
+pub mod model;
+pub mod render_pipeline;
+pub mod resource;
+pub mod shader;
+pub mod texture;
+pub mod vertex;
 
 use std::{
     collections::HashMap,
@@ -12,17 +19,15 @@ use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 
 use winit::{dpi::PhysicalSize, window::Window};
 
-use crate::{
+use crate::{background::load_background, engine::{
     camera::{CameraConfig, CameraInfo},
-    engine::background::load_background,
     instance::Instance,
     model::{DrawModel, Model, ModelVertex},
     render_pipeline::RenderPipelineInfo,
-    resource,
     shader::ShaderInfo,
     texture::{Texture, TextureInfo},
     vertex::Vertex,
-};
+}};
 
 pub enum UserDataType {
     Model(Arc<Model>, Arc<wgpu::Buffer>),

@@ -1,6 +1,6 @@
 use std::{io::Cursor, path::PathBuf};
 // use cfg_if::cfg_if;
-use crate::{model, texture};
+use crate::engine::{model, texture};
 // use tokio::io::AsyncBufReadExt;
 use wgpu::util::DeviceExt;
 
