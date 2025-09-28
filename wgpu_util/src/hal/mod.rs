@@ -7,7 +7,7 @@ const WINDOW_HEIGHT: usize = 800;
 #[allow(unused)]
 pub struct AppSurface {
     pub window: Arc<Window>,
-    pub surface: wgpu::Surface<'static>,    // surface should exist whole time.
+    pub surface: wgpu::Surface<'static>, // surface should exist whole time.
     pub device: wgpu::Device,
     pub adapter: wgpu::Adapter,
     pub queue: wgpu::Queue,
@@ -63,7 +63,7 @@ impl AppSurface {
             device,
             adapter,
             queue,
-            config
+            config,
         })
     }
 }

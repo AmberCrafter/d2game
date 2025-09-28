@@ -2,8 +2,8 @@ version = "1.0.0"
 name = "MyGame grapher"
 
 [resources]
-[resources.shaders.backgound]
-filename = "backgound.wgsl"
+[resources.shaders.background]
+filename = "background.wgsl"
 vertex_entry = "vs_main"
 fragment_entry = "fs_main"
 
@@ -30,25 +30,25 @@ layouts = [
 mode = "INSTANCE"
 
 [resources.bindgroups.camera]
-entries = [{ binding = 0, ty = "Uniform", Visibility = "Vertex" }]
+entries = [{ binding = 0, ty = "Uniform", visibility = "Vertex" }]
 usgae = ["UNIFORM", "COPY_DST"]
 
 [resources.bindgroups.texture]
 entries = [
-    { binding = 0, ty = "Texture", Visibility = "Fragment" },
-    { binding = 1, ty = "Sampler", Visibility = "Fragment" },
+    { binding = 0, ty = "Texture", visibility = "Fragment" },
+    { binding = 1, ty = "Sampler", visibility = "Fragment" },
 ]
 usgae = ["UNIFORM", "COPY_DST"]
 
 [pipelines]
-[pipelines.backgound]
-shader = "backgound"
+[pipelines.background]
+shader = "background"
 depth_texture = true
 vertex_buffer_layouts = ["vertex"]
-bind_group_layout = "texture"
+bind_group_layouts = ["texture", "camera"]
 
 [pipelines.item]
 shader = "item"
 depth_texture = true
 vertex_buffer_layouts = ["vertex", "instance"]
-bind_group_layout = "texture"
+bind_group_layouts = ["texture", "camera"]

@@ -133,7 +133,7 @@ pub struct CameraInfo {
     config: CameraConfig,
     pub uniform: CameraUniform,
     pub buffer: Option<wgpu::Buffer>,
-    pub bind_group_layout: Option<wgpu::BindGroupLayout>,
+    // pub bind_group_layout: Option<wgpu::BindGroupLayout>,
     pub bind_group: Option<wgpu::BindGroup>,
 
     pub controller: CameraController,
@@ -148,7 +148,7 @@ impl CameraInfo {
             config,
             uniform,
             buffer: None,
-            bind_group_layout: None,
+            // bind_group_layout: None,
             bind_group: None,
             controller,
         }
@@ -172,26 +172,26 @@ impl CameraInfo {
         self.uniform.update_view_proj(view_proj);
     }
 
-    pub fn setup(&mut self, device: &Device) {
+    pub fn setup(&mut self, device: &Device, bind_group_layout: &wgpu::BindGroupLayout) {
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera buffer"),
             contents: self.uniform.as_bytes(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Camera bind group layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
+        // let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        //     label: Some("Camera bind group layout"),
+        //     entries: &[wgpu::BindGroupLayoutEntry {
+        //         binding: 0,
+        //         visibility: wgpu::ShaderStages::VERTEX,
+        //         ty: wgpu::BindingType::Buffer {
+        //             ty: wgpu::BufferBindingType::Uniform,
+        //             has_dynamic_offset: false,
+        //             min_binding_size: None,
+        //         },
+        //         count: None,
+        //     }],
+        // });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Camera bind group"),
@@ -203,7 +203,7 @@ impl CameraInfo {
         });
 
         self.buffer.replace(buffer);
-        self.bind_group_layout.replace(bind_group_layout);
+        // self.bind_group_layout.replace(bind_group_layout.clone());
         self.bind_group.replace(bind_group);
     }
 

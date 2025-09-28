@@ -5,19 +5,19 @@ use wgpu::Device;
 use crate::engine::config::{BindGroupEntryType, BindGroupVisibilty, GraphConfig};
 
 #[derive(Debug, Clone)]
-struct BindGroupInfoInner {
-    layout: wgpu::BindGroupLayout,
+pub struct BindGroupInfoInner {
+    pub layout: wgpu::BindGroupLayout,
 }
 
 #[derive(Debug, Clone)]
 pub struct BindGroupInfo {
-    infos: HashMap<String, BindGroupInfoInner>,
+    map: HashMap<String, BindGroupInfoInner>,
 }
 
 impl BindGroupInfo {
     pub fn new() -> Self {
         Self {
-            infos: HashMap::new(),
+            map: HashMap::new(),
         }
     }
 
@@ -44,7 +44,7 @@ impl BindGroupInfo {
                     BindGroupEntryType::Texture => {
                         let entry = wgpu::BindGroupLayoutEntry {
                             binding: entry.binding as u32,
-                            visibility: Self::get_visibility(&entry.Visibility),
+                            visibility: Self::get_visibility(&entry.visibility),
                             ty: wgpu::BindingType::Texture {
                                 sample_type: wgpu::TextureSampleType::Float { filterable: true },
                                 view_dimension: wgpu::TextureViewDimension::D2,
@@ -57,7 +57,7 @@ impl BindGroupInfo {
                     BindGroupEntryType::Sampler => {
                         let entry = wgpu::BindGroupLayoutEntry {
                             binding: entry.binding as u32,
-                            visibility: Self::get_visibility(&entry.Visibility),
+                            visibility: Self::get_visibility(&entry.visibility),
                             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                             count: None,
                         };
@@ -66,7 +66,7 @@ impl BindGroupInfo {
                     BindGroupEntryType::Uniform => {
                         let entry = wgpu::BindGroupLayoutEntry {
                             binding: entry.binding as u32,
-                            visibility: Self::get_visibility(&entry.Visibility),
+                            visibility: Self::get_visibility(&entry.visibility),
                             ty: wgpu::BindingType::Buffer {
                                 ty: wgpu::BufferBindingType::Uniform,
                                 has_dynamic_offset: false,
@@ -105,7 +105,7 @@ impl BindGroupInfo {
             // }
 
             let info = BindGroupInfoInner { layout };
-            self.infos.insert(bg.0.to_string(), info);
+            self.map.insert(bg.0.to_string(), info);
         }
 
         // let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -118,7 +118,11 @@ impl BindGroupInfo {
         // });
     }
 
-    pub fn get(&self, label: &str) -> Option<&BindGroupInfoInner> {
-        self.infos.get(label)
+    pub fn get(&self, label: &str) -> Option<&wgpu::BindGroupLayout> {
+        if let Some(info) = self.map.get(label) {
+            Some(&info.layout)
+        } else {
+            None
+        }
     }
 }

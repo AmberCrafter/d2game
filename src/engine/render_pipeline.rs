@@ -1,120 +1,122 @@
-use crate::engine::{shader::ShaderInfo, texture::Texture};
+use std::collections::HashMap;
 
-pub struct RenderPipelineInfo /*<'a, 'b>*/ {
-    // bind_grop_layouts: Vec<&'a wgpu::BindGroupLayout>,
-    // vertex_buffer_layouts: Vec<wgpu::VertexBufferLayout<'b>>,
-    pub render_pipeline: Option<wgpu::RenderPipeline>,
-    pub layout: Option<wgpu::PipelineLayout>,
+use crate::engine::{
+    bindgroup::BindGroupInfo, config::GraphConfig, shader::ShaderInfo, texture::Texture,
+    vertex::VertexBufferInfo,
+};
+
+struct RenderPipelineInfoInner {
+    layout: wgpu::PipelineLayout,
+    pipeline: wgpu::RenderPipeline,
+}
+
+pub struct RenderPipelineInfo {
+    pub map: HashMap<String, RenderPipelineInfoInner>,
 }
 
 // impl<'a, 'b> RenderPipelineInfo<'a, 'b> {
 impl RenderPipelineInfo {
     pub fn new() -> Self {
         Self {
-            // bind_grop_layouts: Vec::new(),
-            // vertex_buffer_layouts: Vec::new(),
-            render_pipeline: None,
-            layout: None,
+            map: HashMap::new(),
         }
     }
-
-    // pub fn add_bind_group_layout(
-    //     &mut self,
-    //     layout: &'a wgpu::BindGroupLayout,
-    // ) -> anyhow::Result<()> {
-    //     self.bind_grop_layouts.push(layout);
-    //     Ok(())
-    // }
-
-    // pub fn clear_bind_group_layout(&mut self) {
-    //     self.bind_grop_layouts.clear();
-    // }
-
-    // pub fn add_vertex_buffer_layout(
-    //     &mut self,
-    //     layout: wgpu::VertexBufferLayout<'b>,
-    // ) -> anyhow::Result<()> {
-    //     self.vertex_buffer_layouts.push(layout);
-    //     Ok(())
-    // }
-
-    // pub fn clear_vertex_buffer_layout(&mut self) {
-    //     self.vertex_buffer_layouts.clear();
-    // }
-
-    pub fn setup<'a>(
+    pub fn setup(
         &mut self,
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
+
+        graph_config: &GraphConfig,
         shader: &ShaderInfo,
-        vertex_buffer_layouts: Vec<wgpu::VertexBufferLayout<'a>>,
-        bind_group_layouts: Option<Vec<&wgpu::BindGroupLayout>>,
+        vertex_buffer_info: &VertexBufferInfo,
+        bind_group_info: &BindGroupInfo,
     ) -> anyhow::Result<()> {
-        let pipeline_layout = if let Some(bind_group_layouts) = bind_group_layouts {
-            Some(
-                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Render pipeline layout"),
-                    // bind_group_layouts: &self.bind_grop_layouts.as_slice(),
-                    bind_group_layouts: &bind_group_layouts.as_slice(),
-                    push_constant_ranges: &[],
+        for pl in &graph_config.pipelines {
+            let nametag = pl.0;
+
+            let mut bind_group_layouts = Vec::new();
+            for label in &pl.1.bind_group_layouts {
+                bind_group_layouts.push(bind_group_info.get(label).unwrap());
+            }
+
+            let mut vertex_buffer_layouts = Vec::new();
+            for layout in &pl.1.vertex_buffer_layouts {
+                vertex_buffer_layouts.push(vertex_buffer_info.get_desc(&layout).unwrap())
+            }
+
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some(nametag),
+                bind_group_layouts: &bind_group_layouts.as_slice(),
+                push_constant_ranges: &[],
+            });
+
+            let shader_config = graph_config.resources.shaders.get(nametag).unwrap();
+
+            let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(nametag),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: shader.map.get(nametag).unwrap(),
+                    entry_point: Some(&shader_config.vertex_entry),
+                    compilation_options: Default::default(),
+                    buffers: &vertex_buffer_layouts,
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: shader.map.get(nametag).unwrap(),
+                    entry_point: Some(&shader_config.fragment_entry),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: config.format.add_srgb_suffix(),
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent::REPLACE,
+                            alpha: wgpu::BlendComponent::REPLACE,
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
                 }),
-            )
+
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: Some(wgpu::Face::Back),
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                    // unclipped_depth: false,
+                    // conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: Texture::DEPTH_FORMAT,
+                    depth_write_enabled: true,
+                    depth_compare: wgpu::CompareFunction::Less,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                multiview: None,
+                cache: None,
+            });
+
+            let inner = RenderPipelineInfoInner {
+                layout: pipeline_layout,
+                pipeline: render_pipeline,
+            };
+
+            self.map.insert(nametag.to_string(), inner);
+        }
+        Ok(())
+    }
+
+    pub fn get(&self, label: &str) -> Option<&wgpu::RenderPipeline> {
+        if let Some(info) = self.map.get(label) {
+            Some(&info.pipeline)
         } else {
             None
-        };
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render pipeline"),
-            layout: pipeline_layout.as_ref(),
-            vertex: wgpu::VertexState {
-                module: shader.vertex.as_ref().unwrap(),
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &vertex_buffer_layouts.as_slice(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shader.fragment.as_ref().unwrap(),
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format.add_srgb_suffix(),
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent::REPLACE,
-                        alpha: wgpu::BlendComponent::REPLACE,
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-                // unclipped_depth: false,
-                // conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: Texture::DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
-
-        self.render_pipeline.replace(render_pipeline);
-        self.layout = pipeline_layout;
-
-        Ok(())
+        }
     }
 }

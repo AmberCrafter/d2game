@@ -1,50 +1,19 @@
-
-
 pub struct TextureInfo {
-    pub bind_group_layout: Option<wgpu::BindGroupLayout>,
     pub depth_texture: Option<Texture>,
 }
 
 impl TextureInfo {
     pub fn new() -> Self {
         Self {
-            bind_group_layout: None,
             depth_texture: None,
         }
     }
 
     pub fn setup(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("texture_bind_group_layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
-
         let depth_texture = Texture::create_depth_texture(device, config);
-
-        self.bind_group_layout.replace(bind_group_layout);
         self.depth_texture.replace(depth_texture);
     }
-
-
 }
-
 
 #[allow(unused)]
 pub struct Texture {
@@ -171,7 +140,10 @@ impl Texture {
         Texture::from_image(device, queue, label, &img)
     }
 
-    pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
+    pub fn create_depth_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> Self {
         let texture_size = wgpu::Extent3d {
             width: config.width,
             height: config.height,

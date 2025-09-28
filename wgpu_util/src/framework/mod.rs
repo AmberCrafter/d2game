@@ -18,7 +18,9 @@ use winit::{
 
 #[allow(unused)]
 pub trait WgpuAppAction {
-    fn new(window: Arc<Window>) -> impl core::future::Future<Output = Self>;
+    fn new(
+        window: Arc<Window>,
+    ) -> impl core::future::Future<Output = Arc<tokio::sync::Mutex<Self>>>;
     // fn new(window: Arc<Window>) -> Self;
     fn set_window_resized(&mut self, size: PhysicalSize<u32>);
     fn get_size(&self) -> PhysicalSize<u32>;
@@ -49,7 +51,7 @@ pub trait WgpuAppAction {
 struct WgpuAppHandler<A: WgpuAppAction> {
     title: String,
     window: Option<Arc<Window>>,
-    app: Arc<Mutex<Option<A>>>,
+    app: Option<Arc<tokio::sync::Mutex<A>>>,
     last_render_time: std::time::Instant,
 }
 
@@ -59,7 +61,7 @@ impl<A: WgpuAppAction> WgpuAppHandler<A> {
         Self {
             title: title.to_string(),
             window: None,
-            app: Arc::new(Mutex::new(None)),
+            app: None,
             last_render_time: std::time::Instant::now(),
         }
     }
@@ -85,15 +87,6 @@ impl<A: WgpuAppAction> WgpuAppHandler<A> {
 // Implement winit eventloop trait
 impl<A: WgpuAppAction> ApplicationHandler for WgpuAppHandler<A> {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let Ok(mut app) = self.app.as_ref().lock() else {
-            error!("System Error");
-            return;
-        };
-
-        if app.is_some() {
-            return;
-        }
-
         self.last_render_time = std::time::Instant::now();
         let window_attrs = Window::default_attributes();
         let Ok(window) = event_loop.create_window(window_attrs) else {
@@ -109,19 +102,13 @@ impl<A: WgpuAppAction> ApplicationHandler for WgpuAppHandler<A> {
         };
 
         let wgpu_app = rt.block_on(A::new(window.clone()));
-        // let wgpu_app = A::new(window.clone());
-        app.replace(wgpu_app);
-        drop(app);
+        self.app.replace(wgpu_app);
 
         self.config_window(window.clone());
     }
 
     fn suspended(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let Ok(mut app) = self.app.as_ref().lock() else {
-            error!("System Error");
-            return;
-        };
-        app.take();
+        self.app.take();
         self.window.take();
     }
 
@@ -131,15 +118,13 @@ impl<A: WgpuAppAction> ApplicationHandler for WgpuAppHandler<A> {
         window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        let Ok(mut app) = self.app.lock() else {
+        let Ok(rt) = tokio::runtime::Runtime::new() else {
             error!("System Error");
             return;
         };
 
-        let Some(app) = app.as_mut() else {
-            error!("System Error");
-            return;
-        };
+        let app_copy = self.app.clone().unwrap();
+        let mut app = rt.block_on(app_copy.lock());
 
         match event {
             WindowEvent::CloseRequested => {

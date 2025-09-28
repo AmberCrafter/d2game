@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fs, io::{BufReader, Read}};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{BufReader, Read},
+};
 
 use serde::Deserialize;
 
@@ -57,7 +61,7 @@ pub enum BindGroupEntryType {
 pub struct BindGroupEntry {
     pub binding: usize,
     pub ty: BindGroupEntryType,
-    pub Visibility: BindGroupVisibilty,
+    pub visibility: BindGroupVisibilty,
 }
 
 #[derive(Debug, Deserialize)]
@@ -77,7 +81,7 @@ pub struct PipelineConfig {
     pub shader: String,
     pub depth_texture: bool,
     pub vertex_buffer_layouts: Vec<String>,
-    pub bind_group_layout: String,
+    pub bind_group_layouts: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -137,13 +141,13 @@ mode = "INSTANCE"
 
 [resources.bindgroups.camera]
 entries = [
-    {binding = 0, ty = "Uniform", Visibility = "Vertex" },
+    {binding = 0, ty = "Uniform", visibility = "Vertex" },
 ]
 
 [resources.bindgroups.texture]
 entries = [
-    {binding = 0, ty = "Texture", Visibility = "Fragment" },
-    {binding = 1, ty = "Sampler", Visibility = "Fragment" },
+    {binding = 0, ty = "Texture", visibility = "Fragment" },
+    {binding = 1, ty = "Sampler", visibility = "Fragment" },
 ]
 
 [pipelines]
@@ -153,7 +157,7 @@ depth_texture = true
 vertex_buffer_layouts = [
     "vertex",
 ]
-bind_group_layout = "texture"
+bind_group_layouts = ["texture"]
 
 [pipelines.item]
 shader = "item"
@@ -162,7 +166,7 @@ vertex_buffer_layouts = [
     "vertex",
     "instance",
 ]
-bind_group_layout = "texture"
+bind_group_layouts = ["texture", "cam"]
     "#;
 
     #[test]

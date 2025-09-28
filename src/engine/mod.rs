@@ -1,18 +1,21 @@
+pub mod bindgroup;
 pub mod camera;
+pub mod config;
 pub mod instance;
 pub mod model;
+pub mod module;
 pub mod render_pipeline;
 pub mod resource;
 pub mod shader;
 pub mod texture;
 pub mod vertex;
-pub mod config;
-pub mod bindgroup;
 
 use std::{
+    cell::LazyCell,
     collections::HashMap,
     ops::Range,
-    sync::{Arc, Mutex},
+    pin::Pin,
+    sync::{Arc, LazyLock, Mutex, OnceLock},
 };
 
 use cgmath::{InnerSpace, Matrix4, Rotation3};
@@ -21,19 +24,35 @@ use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 
 use winit::{dpi::PhysicalSize, window::Window};
 
-use crate::{background::load_background, engine::{
-    camera::{CameraConfig, CameraInfo},
-    instance::Instance,
-    model::{DrawModel, Model, ModelVertex},
-    render_pipeline::RenderPipelineInfo,
-    shader::ShaderInfo,
-    texture::{Texture, TextureInfo},
-    vertex::Vertex,
-}};
+use crate::{
+    background::{self},
+    engine::{
+        bindgroup::BindGroupInfo,
+        camera::{CameraConfig, CameraInfo},
+        config::GraphConfig,
+        instance::Instance,
+        model::{DrawModel, Model},
+        module::WgpuAppModule,
+        render_pipeline::RenderPipelineInfo,
+        shader::ShaderInfo,
+        texture::{Texture, TextureInfo},
+        vertex::VertexBufferInfo,
+    },
+    item,
+};
 
 pub enum UserDataType {
     Model(Arc<Model>, Arc<wgpu::Buffer>),
     ModelInstance(Arc<Model>, Range<u32>, Arc<wgpu::Buffer>),
+}
+
+pub struct WgpuAppGraphResource {
+    pub graph_config: GraphConfig,
+    pub shader: ShaderInfo,
+    pub texture: TextureInfo,
+    pub vertex_buffer_info: VertexBufferInfo,
+    pub bind_group_info: BindGroupInfo,
+    pub render_pipeline_info: RenderPipelineInfo,
 }
 
 pub struct WgpuApp {
@@ -41,11 +60,16 @@ pub struct WgpuApp {
     pub size: PhysicalSize<u32>,
     pub size_changed: bool,
     pub camera: CameraInfo,
-    pub texture: TextureInfo,
-    pub shader: ShaderInfo,
-    pub render_pipeline: RenderPipelineInfo,
-    pub update_user_data: bool,
+    pub graph_resource: WgpuAppGraphResource,
     pub user_data: Arc<Mutex<HashMap<String, Vec<UserDataType>>>>,
+}
+
+static APP_MODULES: LazyLock<
+    Mutex<HashMap<String, Box<dyn WgpuAppModule + 'static + Sync + Send>>>,
+> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub fn registe_module(name: &str, module: Box<dyn WgpuAppModule + 'static + Sync + Send>) {
+    APP_MODULES.lock().unwrap().insert(name.to_string(), module);
 }
 
 impl WgpuApp {
@@ -57,7 +81,8 @@ impl WgpuApp {
                 .surface
                 .configure(&self.app_surface.device, &self.app_surface.config);
             self.size_changed = false;
-            self.texture
+            self.graph_resource
+                .texture
                 .depth_texture
                 .replace(Texture::create_depth_texture(
                     &self.app_surface.device,
@@ -67,76 +92,15 @@ impl WgpuApp {
     }
 }
 
-fn load_resource(app: &WgpuApp) {
-    let texture_bind_group_layout = app.texture.bind_group_layout.as_ref().unwrap();
-
-    let Ok(rt) = tokio::runtime::Runtime::new() else {
-        return;
-    };
-
-    let obj_model = rt
-        .block_on(resource::load_model(
-            &app.app_surface.device,
-            &app.app_surface.queue,
-            texture_bind_group_layout,
-            "cube.obj",
-        ))
-        .unwrap();
-
-    const NUM_INSTANCE_PER_ROW: u32 = 11;
-    const SPACE_BETWEEN: f32 = 3.0;
-    let instances = (0..NUM_INSTANCE_PER_ROW)
-        .flat_map(|y| {
-            (0..NUM_INSTANCE_PER_ROW).map(move |x| {
-                let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCE_PER_ROW as f32 / 2.0);
-                let y = SPACE_BETWEEN * (y as f32 - NUM_INSTANCE_PER_ROW as f32 / 2.0);
-                let position = cgmath::vec3(x as f32, y as f32, 0 as f32);
-                let rotation = if position.magnitude() < f32::EPSILON {
-                    cgmath::Quaternion::from_axis_angle(
-                        cgmath::vec3(0.0, 0.0, 1.0),
-                        cgmath::Deg(0.0),
-                    )
-                } else {
-                    cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                };
-
-                Instance { position, rotation }
-            })
-        })
-        .collect::<Vec<Instance>>();
-
-    const SIZE_MAT4: usize = core::mem::size_of::<Matrix4<f32>>();
-    let instance_data = instances
-        .iter()
-        .flat_map(|val| {
-            let model = val.as_model();
-            unsafe { core::mem::transmute::<Matrix4<f32>, [u8; SIZE_MAT4]>(model) }
-        })
-        .collect::<Vec<u8>>();
-
-    let instance_buffer =
-        app.app_surface
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Instances buffer"),
-                contents: instance_data.as_slice(),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-
-    let mut datas = Vec::new();
-    datas.push(UserDataType::ModelInstance(
-        Arc::new(obj_model),
-        0..instances.len() as u32,
-        Arc::new(instance_buffer),
-    ));
-    let mut entry_lock = app.user_data.lock().unwrap();
-    let entry = entry_lock.entry("entity".to_string()).or_default();
-    *entry = datas;
-}
-
 impl WgpuAppAction for WgpuApp {
-    async fn new(window: std::sync::Arc<Window>) -> Self {
+    async fn new(window: std::sync::Arc<Window>) -> Arc<tokio::sync::Mutex<Self>> {
         let app_surface = AppSurface::new(window).await.unwrap();
+
+        let graph_config = GraphConfig::new("./src/config/graph.toml");
+        let mut vertex_buffer_info = VertexBufferInfo::new();
+        vertex_buffer_info.setup_config(&graph_config);
+        let mut bind_group_info = BindGroupInfo::new();
+        bind_group_info.setup(&graph_config, &app_surface.device);
 
         let size = PhysicalSize {
             width: app_surface.config.width,
@@ -161,53 +125,56 @@ impl WgpuAppAction for WgpuApp {
         };
         let mut camera = CameraInfo::new(camera_config);
         camera.update_view_proj();
-        camera.setup(&app_surface.device);
+        camera.setup(&app_surface.device, bind_group_info.get("camera").unwrap());
 
         let mut texture = TextureInfo::new();
         texture.setup(&app_surface.device, &app_surface.config);
 
         let mut shader = ShaderInfo::new();
-        shader
-            .setup_vertex_shader(&app_surface.device, "./shader/vertex.wgsl")
-            .unwrap();
-        shader
-            .setup_fragment_shader(&app_surface.device, "./shader/fragment.wgsl")
-            .unwrap();
+        shader.load_config(&app_surface.device, &graph_config);
 
-        let mut render_pipeline = RenderPipelineInfo::new();
-        let mut bind_group_layouts = Vec::new();
-        let mut vertex_buffer_layouts = Vec::new();
-        if let Some(layout) = texture.bind_group_layout.as_ref() {
-            bind_group_layouts.push(layout);
-        }
-        if let Some(layout) = camera.bind_group_layout.as_ref() {
-            bind_group_layouts.push(layout);
-        }
-        vertex_buffer_layouts.push(ModelVertex::desc());
-        vertex_buffer_layouts.push(Instance::desc());
-        render_pipeline
+        let mut render_pipeline_info = RenderPipelineInfo::new();
+        render_pipeline_info
             .setup(
                 &app_surface.device,
                 &app_surface.config,
+                &graph_config,
                 &shader,
-                vertex_buffer_layouts,
-                Some(bind_group_layouts),
+                &vertex_buffer_info,
+                &bind_group_info,
             )
             .unwrap();
 
+        let graph_resource = WgpuAppGraphResource {
+            graph_config,
+            texture,
+            shader,
+            vertex_buffer_info,
+            bind_group_info,
+            render_pipeline_info,
+        };
+
         let user_data = Arc::new(Mutex::new(HashMap::new()));
 
-        Self {
+        registe_module("item", Box::new(item::ItemModule::new()));
+        registe_module("backgorund", Box::new(background::BackgroundModule::new()));
+
+        let app = Self {
             app_surface,
             size,
             size_changed: false,
             camera,
-            texture,
-            shader,
-            render_pipeline,
-            update_user_data: true,
+            graph_resource,
             user_data,
+        };
+
+        let arc_app = Arc::new(tokio::sync::Mutex::new(app));
+        let mut module_lock = APP_MODULES.lock().unwrap();
+        for ele in module_lock.iter_mut() {
+            let _ = ele.1.probe(arc_app.clone()).await;
         }
+
+        arc_app
     }
 
     fn set_window_resized(&mut self, new_size: PhysicalSize<u32>) {
@@ -229,11 +196,10 @@ impl WgpuAppAction for WgpuApp {
         self.camera.controller.process_event(event)
     }
 
-    fn update(&mut self, _dt: std::time::Duration) {
-        if self.update_user_data {
-            load_background(&self);
-            load_resource(&self);
-            self.update_user_data = false;
+    fn update(&mut self, dt: std::time::Duration) {
+        let mut module_lock = APP_MODULES.lock().unwrap();
+        for ele in module_lock.iter_mut() {
+            let _ = ele.1.update(dt);
         }
 
         self.camera.update();
@@ -278,7 +244,13 @@ impl WgpuAppAction for WgpuApp {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.texture.depth_texture.as_ref().unwrap().view,
+                    view: &self
+                        .graph_resource
+                        .texture
+                        .depth_texture
+                        .as_ref()
+                        .unwrap()
+                        .view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -288,17 +260,19 @@ impl WgpuAppAction for WgpuApp {
                 ..Default::default()
             });
 
-            render_pass.set_pipeline(&self.render_pipeline.render_pipeline.as_ref().unwrap());
+            let render_pipeline = self
+                .graph_resource
+                .render_pipeline_info
+                .get("item")
+                .unwrap();
 
+            render_pass.set_pipeline(&render_pipeline);
             for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
                 for data in datas {
                     match data {
                         UserDataType::Model(model, instance_buffer) => {
                             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                            render_pass.draw_model(
-                                model,
-                                self.camera.bind_group.as_ref().unwrap(),
-                            );
+                            render_pass.draw_model(model, self.camera.bind_group.as_ref().unwrap());
                         }
                         UserDataType::ModelInstance(model, instances, instance_buffer) => {
                             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));

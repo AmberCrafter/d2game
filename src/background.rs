@@ -1,12 +1,15 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use cgmath::{Matrix4, Rotation3};
+use tokio::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 use crate::engine::{
     UserDataType, WgpuApp,
     instance::Instance,
     model::{Material, Mesh, Model, ModelVertex},
+    module::WgpuAppModule,
     resource::load_texture,
 };
 
@@ -38,7 +41,8 @@ const VERTICES: &[ModelVertex] = &[
 
 const INDICES: &[u32] = &[0, 1, 2, 2, 1, 3];
 
-pub fn load_background(app: &WgpuApp) {
+async fn load_background(app: Arc<Mutex<WgpuApp>>) {
+    let app = app.lock().await;
     let vertices_data = unsafe { VERTICES.align_to::<u8>().1 };
     let vertex_buffer =
         app.app_surface
@@ -60,19 +64,15 @@ pub fn load_background(app: &WgpuApp) {
                 usage: wgpu::BufferUsages::INDEX,
             });
 
-    let Ok(rt) = tokio::runtime::Runtime::new() else {
-        return;
-    };
-
-    let backgorund_texture = rt
-        .block_on(load_texture(
-            &app.app_surface.device,
-            &app.app_surface.queue,
-            BACKGOUND_IMGAE_PATH,
-        ))
-        .unwrap();
-
-    let background_texture_bind_group_layout = app.texture.bind_group_layout.as_ref().unwrap();
+    let background_texture = load_texture(
+        &app.app_surface.device,
+        &app.app_surface.queue,
+        BACKGOUND_IMGAE_PATH,
+    )
+    .await
+    .unwrap();
+    let background_texture_bind_group_layout =
+        app.graph_resource.bind_group_info.get("texture").unwrap();
     let background_texture_bind_group =
         app.app_surface
             .device
@@ -82,11 +82,11 @@ pub fn load_background(app: &WgpuApp) {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&backgorund_texture.view),
+                        resource: wgpu::BindingResource::TextureView(&background_texture.view),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&backgorund_texture.sampler),
+                        resource: wgpu::BindingResource::Sampler(&background_texture.sampler),
                     },
                 ],
             });
@@ -102,7 +102,7 @@ pub fn load_background(app: &WgpuApp) {
         }],
         materials: vec![Material {
             name: "Backgound".to_string(),
-            diffuse_texture: backgorund_texture,
+            diffuse_texture: background_texture,
             bind_group: background_texture_bind_group,
         }],
     };
@@ -141,4 +141,18 @@ pub fn load_background(app: &WgpuApp) {
     let mut entry_lock = app.user_data.lock().unwrap();
     let entry = entry_lock.entry("background".to_string()).or_default();
     *entry = datas;
+}
+
+pub struct BackgroundModule {}
+
+#[async_trait]
+impl WgpuAppModule for BackgroundModule {
+    fn new() -> Self {
+        Self {}
+    }
+
+    async fn probe(&mut self, app: Arc<Mutex<WgpuApp>>) -> anyhow::Result<()> {
+        load_background(app.clone()).await;
+        Ok(())
+    }
 }
