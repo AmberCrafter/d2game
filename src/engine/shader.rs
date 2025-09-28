@@ -1,8 +1,11 @@
-use std::io::Read;
+use std::{collections::HashMap, io::Read};
+
+use crate::engine::config::GraphConfig;
 
 pub struct ShaderInfo {
     pub vertex: Option<wgpu::ShaderModule>,
     pub fragment: Option<wgpu::ShaderModule>,
+    pub map: HashMap<String, wgpu::ShaderModule>,
 }
 
 impl ShaderInfo {
@@ -10,6 +13,19 @@ impl ShaderInfo {
         Self {
             vertex: None,
             fragment: None,
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn load_config(&mut self, device: &wgpu::Device, config: &GraphConfig) {
+        for shader in &config.resources.shaders {
+            let module = Self::load_shader(
+                device,
+                Some(&shader.0),
+                &format!("./shader/{:}", shader.1.filename),
+            )
+            .unwrap();
+            self.map.insert(shader.0.clone(), module);
         }
     }
 
@@ -19,7 +35,11 @@ impl ShaderInfo {
         Ok(())
     }
 
-    pub fn setup_fragment_shader(&mut self, device: &wgpu::Device, path: &str) -> anyhow::Result<()> {
+    pub fn setup_fragment_shader(
+        &mut self,
+        device: &wgpu::Device,
+        path: &str,
+    ) -> anyhow::Result<()> {
         let shader = Self::load_shader(device, Some("Fragment shader"), path)?;
         self.fragment.replace(shader);
         Ok(())

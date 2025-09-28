@@ -18,7 +18,7 @@ layouts = [
     { location = 1, format = "Float32x2" },
     { location = 2, format = "Float32x3" },
 ]
-usgae = ["VERTEX"]
+mode = "VERTEX"
 
 [resources.vertexbuffers.instance]
 layouts = [
@@ -27,7 +27,7 @@ layouts = [
     { location = 7, format = "Float32x4" },
     { location = 8, format = "Float32x4" },
 ]
-usgae = ["INDEX"]
+mode = "INSTANCE"
 
 [resources.bindgroups.camera]
 entries = [{ binding = 0, ty = "Uniform", Visibility = "Vertex" }]

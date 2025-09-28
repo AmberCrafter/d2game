@@ -1,26 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, io::{BufReader, Read}};
 
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-struct ShaderConfig {
-    filename: String,
-    vertex_entry: String,
-    fragment_entry: String,
+pub struct ShaderConfig {
+    pub filename: String,
+    pub vertex_entry: String,
+    pub fragment_entry: String,
 }
 
 #[derive(Debug, Deserialize)]
-enum BufferUsage {
-    COPY_SRC,
-    COPY_DST,
-    VERTEX,
-    INDEX,
-    UNIFORM,
-    STORAGE,
-}
-
-#[derive(Debug, Deserialize)]
-enum VertexBufferLayoutFormat {
+pub enum VertexBufferLayoutFormat {
     Float32,
     Float32x2,
     Float32x3,
@@ -28,26 +18,32 @@ enum VertexBufferLayoutFormat {
 }
 
 #[derive(Debug, Deserialize)]
-struct VertexBufferLayout {
-    location: usize,
-    format: VertexBufferLayoutFormat,
+pub struct VertexBufferLayout {
+    pub location: usize,
+    pub format: VertexBufferLayoutFormat,
 }
 
 #[derive(Debug, Deserialize)]
-struct VertexBufferConfig {
-    layouts: Vec<VertexBufferLayout>,
-    usgae: Vec<BufferUsage>,
+pub enum VertexStepMode {
+    VERTEX,
+    INSTANCE,
 }
 
 #[derive(Debug, Deserialize)]
-enum BindGroupVisibilty {
+pub struct VertexBufferConfig {
+    pub layouts: Vec<VertexBufferLayout>,
+    pub mode: VertexStepMode,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum BindGroupVisibilty {
     Vertex,
     Fragment,
     ALL,
 }
 
 #[derive(Debug, Deserialize)]
-enum BindGroupEntryType {
+pub enum BindGroupEntryType {
     Texture,
     Sampler,
 
@@ -58,39 +54,49 @@ enum BindGroupEntryType {
 }
 
 #[derive(Debug, Deserialize)]
-struct BindGroupEntry {
-    binding: usize,
-    ty: BindGroupEntryType,
-    Visibility: BindGroupVisibilty,
+pub struct BindGroupEntry {
+    pub binding: usize,
+    pub ty: BindGroupEntryType,
+    pub Visibility: BindGroupVisibilty,
 }
 
 #[derive(Debug, Deserialize)]
-struct BindGroupConfig {
-    entries: Vec<BindGroupEntry>,
-    usgae: Vec<BufferUsage>,
+pub struct BindGroupConfig {
+    pub entries: Vec<BindGroupEntry>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ResourceConfig {
-    shaders: HashMap<String, ShaderConfig>,
-    vertexbuffers: HashMap<String, VertexBufferConfig>,
-    bindgroups: HashMap<String, BindGroupConfig>,
+pub struct ResourceConfig {
+    pub shaders: HashMap<String, ShaderConfig>,
+    pub vertexbuffers: HashMap<String, VertexBufferConfig>,
+    pub bindgroups: HashMap<String, BindGroupConfig>,
 }
 
 #[derive(Debug, Deserialize)]
-struct PipelineConfig {
-    shader: String,
-    depth_texture: bool,
-    vertex_buffer_layouts: Vec<String>,
-    bind_group_layout: String,
+pub struct PipelineConfig {
+    pub shader: String,
+    pub depth_texture: bool,
+    pub vertex_buffer_layouts: Vec<String>,
+    pub bind_group_layout: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct GraphConfig {
-    version: String,
-    name: String,
-    resources: ResourceConfig,
-    pipelines: HashMap<String, PipelineConfig>,
+pub struct GraphConfig {
+    pub version: String,
+    pub name: String,
+    pub resources: ResourceConfig,
+    pub pipelines: HashMap<String, PipelineConfig>,
+}
+
+impl GraphConfig {
+    pub fn new(path: &str) -> Self {
+        let file = fs::File::open(path).unwrap();
+        let mut reader = BufReader::new(file);
+        let mut buffer = String::new();
+        reader.read_to_string(&mut buffer).unwrap();
+        let config: GraphConfig = toml::from_str(&buffer).unwrap();
+        config
+    }
 }
 
 #[cfg(test)]
@@ -118,7 +124,7 @@ layouts = [
     {location = 1, format = "Float32x2"},
     {location = 2, format = "Float32x3"},
 ]
-usgae = [ "VERTEX" ]
+mode = "VERTEX"
 
 [resources.vertexbuffers.instance]
 layouts = [
@@ -127,20 +133,18 @@ layouts = [
     {location = 7, format = "Float32x4"},
     {location = 8, format = "Float32x4"},
 ]
-usgae = [ "INDEX" ]
+mode = "INSTANCE"
 
 [resources.bindgroups.camera]
 entries = [
     {binding = 0, ty = "Uniform", Visibility = "Vertex" },
 ]
-usgae = [ "UNIFORM", "COPY_DST" ]
 
 [resources.bindgroups.texture]
 entries = [
     {binding = 0, ty = "Texture", Visibility = "Fragment" },
     {binding = 1, ty = "Sampler", Visibility = "Fragment" },
 ]
-usgae = [ "UNIFORM", "COPY_DST" ]
 
 [pipelines]
 [pipelines.backgound]
