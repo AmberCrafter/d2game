@@ -9,13 +9,29 @@ pub struct ModelVertex {
 }
 
 #[allow(unused)]
+#[derive(Debug, Default)]
 pub struct Material {
     pub name: String,
-    pub diffuse_texture: crate::engine::texture::Texture,
-    pub bind_group: wgpu::BindGroup,
+    pub ambient: Option<wgpu::Buffer>,
+    pub diffuse: Option<wgpu::Buffer>,
+    pub specular: Option<wgpu::Buffer>,
+    pub shininess: Option<wgpu::Buffer>,
+    pub optical_density: Option<wgpu::Buffer>,
+    pub ambient_texture: Option<crate::engine::texture::Texture>,
+    pub diffuse_texture: Option<crate::engine::texture::Texture>,
+    pub specular_texture: Option<crate::engine::texture::Texture>,
+    pub normal_texture: Option<crate::engine::texture::Texture>,
+    pub shininess_texture: Option<crate::engine::texture::Texture>,
+    pub dissolve_texture: Option<crate::engine::texture::Texture>,
+    pub illumination_model: Option<wgpu::Buffer>,
+
+    // pub buffers: Option<Vec<wgpu::Buffer>>,
+    // pub textures: Option<Vec<wgpu::Texture>>,
+    pub bind_group: Option<wgpu::BindGroup>,
 }
 
 #[allow(unused)]
+#[derive(Debug)]
 pub struct Mesh {
     pub name: String,
     pub vertex_buffer: wgpu::Buffer,
@@ -24,6 +40,7 @@ pub struct Mesh {
     pub material: usize,
 }
 
+#[derive(Debug)]
 pub struct Model {
     pub meshes: Vec<Mesh>,
     pub materials: Vec<Material>,
@@ -89,6 +106,8 @@ impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
         instances: Range<u32>,
         camera_bind_group: &'b wgpu::BindGroup,
     ) {
+        // println!("[Debug] {:?}({:?}) {:?}", file!(), line!(), model);
+        
         for mesh in model.meshes.iter() {
             let material = &model.materials[mesh.material];
             self.draw_mesh_instanced(&mesh, material, instances.clone(), camera_bind_group);

@@ -43,11 +43,18 @@ fn vs_main(
 
 
 @group(0) @binding(0)
-var t_diffuse: texture_2d<f32>;
+var<uniform> ambient: vec3f;
 @group(0) @binding(1)
-var s_diffuse: sampler;
+var<uniform> diffuse: vec3f;
+@group(0) @binding(2)
+var<uniform> specular: vec3f;
+@group(0) @binding(3)
+var<uniform> shininess: f32;
+@group(0) @binding(5)
+var<uniform> refractiveIndex: f32;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    var cal_val: vec3f = ambient + diffuse + specular;
+    return vec4f(cal_val, 1.0);
 }

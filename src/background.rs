@@ -14,7 +14,7 @@ use crate::engine::{
 };
 
 const BACKGOUND_IMGAE_PATH: &str = "grassland.jpg";
-const BG_SIZE: f32 = 25.0;
+const BG_SIZE: f32 = 100.0;
 const BG_LAYZER: f32 = -5.0;
 const VERTICES: &[ModelVertex] = &[
     ModelVertex {
@@ -72,7 +72,7 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
     .await
     .unwrap();
     let background_texture_bind_group_layout =
-        app.graph_resource.bind_group_info.get("texture").unwrap();
+        app.graph_resource.bind_group_info.get("bg_texture").unwrap();
     let background_texture_bind_group =
         app.app_surface
             .device
@@ -81,11 +81,11 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
                 layout: background_texture_bind_group_layout,
                 entries: &[
                     wgpu::BindGroupEntry {
-                        binding: 0,
+                        binding: 8,
                         resource: wgpu::BindingResource::TextureView(&background_texture.view),
                     },
                     wgpu::BindGroupEntry {
-                        binding: 1,
+                        binding: 9,
                         resource: wgpu::BindingResource::Sampler(&background_texture.sampler),
                     },
                 ],
@@ -102,13 +102,14 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
         }],
         materials: vec![Material {
             name: "Backgound".to_string(),
-            diffuse_texture: background_texture,
-            bind_group: background_texture_bind_group,
+            diffuse_texture: Some(background_texture),
+            bind_group: Some(background_texture_bind_group),
+            ..Default::default()
         }],
     };
 
     let instances = {
-        let position = cgmath::vec3(1.0, 2.0, 3.0);
+        let position = cgmath::vec3(0.0, 0.0, 0.0);
         let rotation =
             cgmath::Quaternion::from_axis_angle(cgmath::vec3(0.0, 0.0, 1.0), cgmath::Deg(90.0));
 

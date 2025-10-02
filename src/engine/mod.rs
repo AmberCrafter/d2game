@@ -38,7 +38,7 @@ use crate::{
         texture::{Texture, TextureInfo},
         vertex::VertexBufferInfo,
     },
-    item,
+    item, player,
 };
 
 pub enum UserDataType {
@@ -111,7 +111,7 @@ impl WgpuAppAction for WgpuApp {
         // y: screen top
         // z: out of screen (to user)
         let camera_config = CameraConfig {
-            eye: (f32::EPSILON, 0.0, 30.0).into(),
+            eye: (f32::EPSILON, 0.0, 100.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3 {
                 x: 0.0,
@@ -121,7 +121,7 @@ impl WgpuAppAction for WgpuApp {
             aspect: app_surface.config.width as f32 / app_surface.config.height as f32,
             fovy: 45.0,
             znear: 0.1,
-            zfar: 100.0,
+            zfar: 200.0,
         };
         let mut camera = CameraInfo::new(camera_config);
         camera.update_view_proj();
@@ -156,8 +156,9 @@ impl WgpuAppAction for WgpuApp {
 
         let user_data = Arc::new(Mutex::new(HashMap::new()));
 
-        registe_module("item", Box::new(item::ItemModule::new()));
-        registe_module("backgorund", Box::new(background::BackgroundModule::new()));
+        // registe_module("item", Box::new(item::ItemModule::new()));
+        registe_module("player", Box::new(player::PlayerModule::new()));
+        registe_module("background", Box::new(background::BackgroundModule::new()));
 
         let app = Self {
             app_surface,
@@ -193,7 +194,9 @@ impl WgpuAppAction for WgpuApp {
     }
 
     fn keyboard_input(&mut self, event: &winit::event::KeyEvent, _is_synthetic: bool) -> bool {
-        self.camera.controller.process_event(event)
+        // self.camera.controller.process_event(event)
+
+        true
     }
 
     fn update(&mut self, dt: std::time::Duration) {
@@ -268,6 +271,36 @@ impl WgpuAppAction for WgpuApp {
 
             render_pass.set_pipeline(&render_pipeline);
             for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
+                // println!("[Debug] {:?}({:?}) {data_tag:?}", file!(), line!());
+                if data_tag == "background" { continue; }
+                for data in datas {
+                    match data {
+                        UserDataType::Model(model, instance_buffer) => {
+                            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+                            render_pass.draw_model(model, self.camera.bind_group.as_ref().unwrap());
+                        }
+                        UserDataType::ModelInstance(model, instances, instance_buffer) => {
+                            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+                            render_pass.draw_model_instanced(
+                                model,
+                                instances.clone(),
+                                self.camera.bind_group.as_ref().unwrap(),
+                            );
+                        }
+                    }
+                }
+            }
+
+            let render_pipeline = self
+                .graph_resource
+                .render_pipeline_info
+                .get("background")
+                .unwrap();
+
+            render_pass.set_pipeline(&render_pipeline);
+            for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
+                // println!("[Debug] {:?}({:?}) {data_tag:?}", file!(), line!());
+                if data_tag != "background" { continue; }
                 for data in datas {
                     match data {
                         UserDataType::Model(model, instance_buffer) => {

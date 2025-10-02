@@ -98,29 +98,264 @@ pub async fn load_model(
 
     let mut materials = Vec::new();
     for mtl in obj_materials? {
-        if let Some(texture_file) = mtl.diffuse_texture {
-            let diffuse_texture = load_texture(device, queue, &texture_file).await?;
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some(&format!("[{file_name}] {texture_file}")),
-                layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                    },
-                ],
-            });
+        let mut entries = Vec::new();
 
-            materials.push(model::Material {
-                name: mtl.name,
-                diffuse_texture,
-                bind_group,
+        // 0
+        let ambient = if let Some(ambient) = mtl.ambient {
+            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("[{file_name}] ambient")),
+                contents: unsafe { ambient.align_to::<u8>().1 },
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+            Some(buffer)
+        } else {
+            None
+        };
+        if let Some(buffer) = ambient.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            });
+        };
+
+        // 1
+        let diffuse = if let Some(diffuse) = mtl.diffuse {
+            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("[{file_name}] diffuse")),
+                contents: unsafe { diffuse.align_to::<u8>().1 },
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+            Some(buffer)
+        } else {
+            None
+        };
+        if let Some(buffer) = diffuse.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 1,
+                resource: buffer.as_entire_binding(),
+            });
+        };
+
+        // 2
+        let specular = if let Some(specular) = mtl.specular {
+            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("[{file_name}] specular")),
+                contents: unsafe { specular.align_to::<u8>().1 },
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+            Some(buffer)
+        } else {
+            None
+        };
+        if let Some(buffer) = specular.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 2,
+                resource: buffer.as_entire_binding(),
+            });
+        };
+
+        // 3
+        let shininess = if let Some(shininess) = mtl.shininess {
+            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("[{file_name}] shininess")),
+                contents: &shininess.to_ne_bytes(),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+            Some(buffer)
+        } else {
+            None
+        };
+        if let Some(buffer) = shininess.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 3,
+                resource: buffer.as_entire_binding(),
+            });
+        };
+
+        // 4
+        let dissolve = if let Some(dissolve) = mtl.dissolve {
+            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("[{file_name}] dissolve")),
+                contents: &dissolve.to_ne_bytes(),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+            Some(buffer)
+        } else {
+            None
+        };
+        if let Some(buffer) = dissolve.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 4,
+                resource: buffer.as_entire_binding(),
+            });
+        };
+
+        // 5
+        let optical_density = if let Some(optical_density) = mtl.optical_density {
+            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("[{file_name}] optical_density")),
+                contents: &optical_density.to_ne_bytes(),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+            Some(buffer)
+        } else {
+            None
+        };
+        if let Some(buffer) = optical_density.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 5,
+                resource: buffer.as_entire_binding(),
+            });
+        };
+
+        // 6, 7
+        let ambient_texture = if let Some(texture_file) = mtl.ambient_texture {
+            let ambient_texture = load_texture(device, queue, &texture_file).await?;
+            Some(ambient_texture)
+        } else {
+            None
+        };
+        if let Some(texture) = ambient_texture.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 6,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: 7,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
             });
         }
+
+        // 8, 9
+        let diffuse_texture = if let Some(texture_file) = mtl.diffuse_texture {
+            let diffuse_texture = load_texture(device, queue, &texture_file).await?;
+            Some(diffuse_texture)
+        } else {
+            None
+        };
+        if let Some(texture) = diffuse_texture.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 8,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: 9,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            });
+        }
+
+        // 10, 11
+        let specular_texture = if let Some(texture_file) = mtl.specular_texture {
+            let specular_texture = load_texture(device, queue, &texture_file).await?;
+            Some(specular_texture)
+        } else {
+            None
+        };
+        if let Some(texture) = specular_texture.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 10,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: 11,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            });
+        }
+
+        // 12, 13
+        let normal_texture = if let Some(texture_file) = mtl.normal_texture {
+            let normal_texture = load_texture(device, queue, &texture_file).await?;
+            Some(normal_texture)
+        } else {
+            None
+        };
+        if let Some(texture) = normal_texture.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 12,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: 13,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            });
+        }
+
+        // 14, 15
+        let shininess_texture = if let Some(texture_file) = mtl.shininess_texture {
+            let shininess_texture = load_texture(device, queue, &texture_file).await?;
+            Some(shininess_texture)
+        } else {
+            None
+        };
+        if let Some(texture) = shininess_texture.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 14,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: 15,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            });
+        }
+
+        // 16, 17
+        let dissolve_texture = if let Some(texture_file) = mtl.dissolve_texture {
+            let dissolve_texture = load_texture(device, queue, &texture_file).await?;
+            Some(dissolve_texture)
+        } else {
+            None
+        };
+        if let Some(texture) = dissolve_texture.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 16,
+                resource: wgpu::BindingResource::TextureView(&texture.view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: 17,
+                resource: wgpu::BindingResource::Sampler(&texture.sampler),
+            });
+        }
+
+        // 18
+        let illumination_model = if let Some(illumination_model) = mtl.illumination_model {
+            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&format!("[{file_name}] optical_density")),
+                contents: &illumination_model.to_ne_bytes(),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+            Some(buffer)
+        } else {
+            None
+        };
+        if let Some(buffer) = illumination_model.as_ref() {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 18,
+                resource: buffer.as_entire_binding(),
+            });
+        };
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(&format!("{file_name} bind_group")),
+            layout,
+            entries: &entries,
+        });
+
+        materials.push(model::Material {
+            name: mtl.name,
+            ambient,
+            diffuse,
+            specular,
+            shininess,
+            optical_density,
+            ambient_texture,
+            diffuse_texture,
+            specular_texture,
+            normal_texture,
+            shininess_texture,
+            dissolve_texture,
+            illumination_model,
+            bind_group: Some(bind_group),
+        });
     }
 
     let mut meshes = Vec::new();

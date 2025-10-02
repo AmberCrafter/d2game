@@ -80,7 +80,7 @@ impl WgpuAppModule for ItemModule {
     }
 
     async fn probe(&mut self, app: Arc<tokio::sync::Mutex<WgpuApp>>) -> anyhow::Result<()> {
-        load_resource(app.clone()).await;
+        // load_resource(app.clone()).await;
         Ok(())
     }
 

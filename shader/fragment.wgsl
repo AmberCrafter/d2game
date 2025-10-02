@@ -3,9 +3,9 @@ struct VertexOutput {
     @location(0) tex_coords: vec2f,
 };
 
-@group(0) @binding(0)
+@group(0) @binding(8)
 var t_diffuse: texture_2d<f32>;
-@group(0) @binding(1)
+@group(0) @binding(9)
 var s_diffuse: sampler;
 
 @fragment

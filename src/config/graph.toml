@@ -33,10 +33,46 @@ mode = "INSTANCE"
 entries = [{ binding = 0, ty = "Uniform", visibility = "Vertex" }]
 usgae = ["UNIFORM", "COPY_DST"]
 
+[resources.bindgroups.bg_texture]
+entries = [
+    { name = "diffuse_texture", binding = 8, ty = "Texture", visibility = "Fragment" },
+    { name = "diffuse_sampler", binding = 9, ty = "Sampler", visibility = "Fragment" },
+]
+usgae = ["UNIFORM", "COPY_DST"]
+
+[resources.bindgroups.player_texture]
+entries = [
+    { name = "ambient", binding = 0, ty = "Uniform", visibility = "Fragment" },
+    { name = "diffuse", binding = 1, ty = "Uniform", visibility = "Fragment" },
+    { name = "specular", binding = 2, ty = "Uniform", visibility = "Fragment" },
+    { name = "shininess", binding = 3, ty = "Uniform", visibility = "Fragment" },
+    { name = "dissolve", binding = 4, ty = "Uniform", visibility = "Fragment" },
+    { name = "optical_density", binding = 5, ty = "Uniform", visibility = "Fragment" },
+    { name = "illumination_model", binding = 18, ty = "Uniform", visibility = "Fragment" },
+]
+usgae = ["UNIFORM", "COPY_DST"]
+
 [resources.bindgroups.texture]
 entries = [
-    { binding = 0, ty = "Texture", visibility = "Fragment" },
-    { binding = 1, ty = "Sampler", visibility = "Fragment" },
+    { name = "ambient", binding = 0, ty = "Uniform", visibility = "Fragment" },
+    { name = "diffuse", binding = 1, ty = "Uniform", visibility = "Fragment" },
+    { name = "specular", binding = 2, ty = "Uniform", visibility = "Fragment" },
+    { name = "shininess", binding = 3, ty = "Uniform", visibility = "Fragment" },
+    { name = "dissolve", binding = 4, ty = "Uniform", visibility = "Fragment" },
+    { name = "optical_density", binding = 5, ty = "Uniform", visibility = "Fragment" },
+    { name = "ambient_texture", binding = 6, ty = "Texture", visibility = "Fragment" },
+    { name = "ambient_sampler", binding = 7, ty = "Sampler", visibility = "Fragment" },
+    { name = "diffuse_texture", binding = 8, ty = "Texture", visibility = "Fragment" },
+    { name = "diffuse_sampler", binding = 9, ty = "Sampler", visibility = "Fragment" },
+    { name = "specular_texture", binding = 10, ty = "Texture", visibility = "Fragment" },
+    { name = "specular_sampler", binding = 11, ty = "Sampler", visibility = "Fragment" },
+    { name = "normal_texture", binding = 12, ty = "Texture", visibility = "Fragment" },
+    { name = "normal_sampler", binding = 13, ty = "Sampler", visibility = "Fragment" },
+    { name = "shininess_texture", binding = 14, ty = "Texture", visibility = "Fragment" },
+    { name = "shininess_sampler", binding = 15, ty = "Sampler", visibility = "Fragment" },
+    { name = "dissolve_texture", binding = 16, ty = "Texture", visibility = "Fragment" },
+    { name = "dissolve_sampler", binding = 17, ty = "Sampler", visibility = "Fragment" },
+    { name = "illumination_model", binding = 18, ty = "Uniform", visibility = "Fragment" },
 ]
 usgae = ["UNIFORM", "COPY_DST"]
 
@@ -45,10 +81,10 @@ usgae = ["UNIFORM", "COPY_DST"]
 shader = "background"
 depth_texture = true
 vertex_buffer_layouts = ["vertex"]
-bind_group_layouts = ["texture", "camera"]
+bind_group_layouts = ["bg_texture", "camera"]
 
 [pipelines.item]
 shader = "item"
 depth_texture = true
 vertex_buffer_layouts = ["vertex", "instance"]
-bind_group_layouts = ["texture", "camera"]
+bind_group_layouts = ["player_texture", "camera"]
