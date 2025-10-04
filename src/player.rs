@@ -28,8 +28,9 @@ async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
         let position = cgmath::vec3(0.0, 0.0, 0.0);
         let rotation =
             cgmath::Quaternion::from_axis_angle(cgmath::vec3(0.0, 0.0, 1.0), cgmath::Deg(0.0));
+        let scale = 5.0;
 
-        Instance { position, rotation }
+        Instance { position, rotation, scale }
     }];
 
     const SIZE_MAT4: usize = core::mem::size_of::<Matrix4<f32>>();

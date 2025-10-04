@@ -3,12 +3,13 @@ use cgmath::Matrix;
 pub struct Instance {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
+    pub scale: f32,
 }
 
 #[allow(unused)]
 impl Instance {
     pub fn as_model(&self) -> cgmath::Matrix4<f32> {
-        cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)
+        cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation) * cgmath::Matrix4::from_scale(self.scale)
     }
 
     pub fn as_bytes(&self) -> &[u8] {

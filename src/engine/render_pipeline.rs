@@ -50,19 +50,19 @@ impl RenderPipelineInfo {
                 push_constant_ranges: &[],
             });
 
-            let shader_config = graph_config.resources.shaders.get(nametag).unwrap();
+            let shader_config = graph_config.resources.shaders.get(&pl.1.shader).unwrap();
 
             let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(nametag),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
-                    module: shader.map.get(nametag).unwrap(),
+                    module: shader.map.get(&pl.1.shader).unwrap(),
                     entry_point: Some(&shader_config.vertex_entry),
                     compilation_options: Default::default(),
                     buffers: &vertex_buffer_layouts,
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: shader.map.get(nametag).unwrap(),
+                    module: shader.map.get(&pl.1.shader).unwrap(),
                     entry_point: Some(&shader_config.fragment_entry),
                     compilation_options: Default::default(),
                     targets: &[Some(wgpu::ColorTargetState {

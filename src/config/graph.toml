@@ -88,3 +88,9 @@ shader = "item"
 depth_texture = true
 vertex_buffer_layouts = ["vertex", "instance"]
 bind_group_layouts = ["player_texture", "camera"]
+
+[pipelines.player]
+shader = "item"
+depth_texture = true
+vertex_buffer_layouts = ["vertex", "instance"]
+bind_group_layouts = ["player_texture", "camera"]

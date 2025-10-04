@@ -10,6 +10,7 @@ struct VertexOutput {
 };
 
 struct CameraUniform {
+    view_pos: vec4f,
     view_proj: mat4x4f,
 };
 

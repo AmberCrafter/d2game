@@ -19,12 +19,12 @@ impl ShaderInfo {
 
     pub fn load_config(&mut self, device: &wgpu::Device, config: &GraphConfig) {
         for shader in &config.resources.shaders {
-            println!(
-                "[Debug] {:?}({:?}) {:?}",
-                file!(),
-                line!(),
-                shader.1.filename
-            );
+            // println!(
+            //     "[Debug] {:?}({:?}) {:?}",
+            //     file!(),
+            //     line!(),
+            //     shader.1.filename
+            // );
             let module = Self::load_shader(
                 device,
                 Some(&shader.0),

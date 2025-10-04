@@ -19,22 +19,22 @@ const BG_LAYZER: f32 = -5.0;
 const VERTICES: &[ModelVertex] = &[
     ModelVertex {
         position: [BG_SIZE, BG_SIZE, BG_LAYZER],
-        tex_coord: [1.0, 0.0],
+        tex_coord: [2.0, -2.0],
         normal: [0.0, 0.0, 0.0],
     },
     ModelVertex {
         position: [-BG_SIZE, BG_SIZE, BG_LAYZER],
-        tex_coord: [0.0, 0.0],
+        tex_coord: [-2.0, -2.0],
         normal: [0.0, 0.0, 0.0],
     },
     ModelVertex {
         position: [BG_SIZE, -BG_SIZE, BG_LAYZER],
-        tex_coord: [1.0, 1.0],
+        tex_coord: [2.0, 2.0],
         normal: [0.0, 0.0, 0.0],
     },
     ModelVertex {
         position: [-BG_SIZE, -BG_SIZE, BG_LAYZER],
-        tex_coord: [0.0, 1.0],
+        tex_coord: [-2.0, 2.0],
         normal: [0.0, 0.0, 0.0],
     },
 ];
@@ -112,8 +112,8 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
         let position = cgmath::vec3(0.0, 0.0, 0.0);
         let rotation =
             cgmath::Quaternion::from_axis_angle(cgmath::vec3(0.0, 0.0, 1.0), cgmath::Deg(90.0));
-
-        Instance { position, rotation }
+        let scale = 1.0;
+        Instance { position, rotation, scale }
     };
 
     const SIZE_MAT4: usize = core::mem::size_of::<Matrix4<f32>>();

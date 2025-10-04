@@ -1,9 +1,10 @@
-use cgmath::{Deg, InnerSpace, Matrix, SquareMatrix};
+use cgmath::{Deg, EuclideanSpace, InnerSpace, Matrix, SquareMatrix};
 use wgpu::{Device, util::DeviceExt};
 use winit::event::KeyEvent;
 
 type Pos3 = cgmath::Point3<f32>;
 type Vec3 = cgmath::Vector3<f32>;
+type Vec4 = cgmath::Vector4<f32>;
 type Mat4 = cgmath::Matrix4<f32>;
 
 pub struct CameraConfig {
@@ -16,23 +17,34 @@ pub struct CameraConfig {
     pub zfar: f32,
 }
 
+#[derive(Debug, Clone)]
+#[repr(C)]
 pub struct CameraUniform {
+    view_pos: Vec4,
     view_proj: Mat4,
 }
 
 impl CameraUniform {
     fn new() -> Self {
         Self {
+            view_pos: Vec4::new(0.0, 0.0, 0.0, 0.0),
             view_proj: Mat4::identity(),
         }
+    }
+
+    fn update_view_pos(&mut self, val: Vec4) {
+        self.view_pos = val;
     }
 
     fn update_view_proj(&mut self, val: Mat4) {
         self.view_proj = val;
     }
 
-    pub fn as_bytes<'a>(&'a self) -> &'a [u8] {
-        unsafe { &(*(self.view_proj.as_ptr() as *const [u8; core::mem::size_of::<Mat4>()])) }
+    pub fn as_bytes(&self) -> [u8; 80] {
+        // unsafe { &(*(self.view_proj.as_ptr() as *const [u8; core::mem::size_of::<Mat4>()])) }
+        unsafe {
+            core::mem::transmute::<CameraUniform, [u8; 80]>(self.clone())
+        }
     }
 }
 
@@ -167,15 +179,17 @@ impl CameraInfo {
         return proj * view;
     }
 
-    pub fn update_view_proj(&mut self) {
+    pub fn update_view(&mut self) {
+        let view_pos = Vec4::new(self.config.eye.x, self.config.eye.y, self.config.eye.z, 0.0);
         let view_proj = self.build_view_projection_matrix();
+        self.uniform.update_view_pos(view_pos);
         self.uniform.update_view_proj(view_proj);
     }
 
     pub fn setup(&mut self, device: &Device, bind_group_layout: &wgpu::BindGroupLayout) {
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera buffer"),
-            contents: self.uniform.as_bytes(),
+            contents: &self.uniform.as_bytes(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -209,6 +223,6 @@ impl CameraInfo {
 
     pub fn update(&mut self) {
         self.controller.update_camera_config(&mut self.config);
-        self.update_view_proj();
+        self.update_view();
     }
 }

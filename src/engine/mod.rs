@@ -124,7 +124,7 @@ impl WgpuAppAction for WgpuApp {
             zfar: 200.0,
         };
         let mut camera = CameraInfo::new(camera_config);
-        camera.update_view_proj();
+        camera.update_view();
         camera.setup(&app_surface.device, bind_group_info.get("camera").unwrap());
 
         let mut texture = TextureInfo::new();
@@ -209,7 +209,7 @@ impl WgpuAppAction for WgpuApp {
         self.app_surface.queue.write_buffer(
             self.camera.buffer.as_ref().unwrap(),
             0,
-            self.camera.uniform.as_bytes(),
+            &self.camera.uniform.as_bytes(),
         );
     }
 
@@ -263,44 +263,18 @@ impl WgpuAppAction for WgpuApp {
                 ..Default::default()
             });
 
-            let render_pipeline = self
-                .graph_resource
-                .render_pipeline_info
-                .get("item")
-                .unwrap();
 
-            render_pass.set_pipeline(&render_pipeline);
             for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
                 // println!("[Debug] {:?}({:?}) {data_tag:?}", file!(), line!());
-                if data_tag == "background" { continue; }
-                for data in datas {
-                    match data {
-                        UserDataType::Model(model, instance_buffer) => {
-                            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                            render_pass.draw_model(model, self.camera.bind_group.as_ref().unwrap());
-                        }
-                        UserDataType::ModelInstance(model, instances, instance_buffer) => {
-                            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                            render_pass.draw_model_instanced(
-                                model,
-                                instances.clone(),
-                                self.camera.bind_group.as_ref().unwrap(),
-                            );
-                        }
-                    }
-                }
-            }
 
-            let render_pipeline = self
-                .graph_resource
-                .render_pipeline_info
-                .get("background")
-                .unwrap();
+                let render_pipeline = self
+                    .graph_resource
+                    .render_pipeline_info
+                    .get(data_tag)
+                    .unwrap();
 
-            render_pass.set_pipeline(&render_pipeline);
-            for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
-                // println!("[Debug] {:?}({:?}) {data_tag:?}", file!(), line!());
-                if data_tag != "background" { continue; }
+                render_pass.set_pipeline(&render_pipeline);
+
                 for data in datas {
                     match data {
                         UserDataType::Model(model, instance_buffer) => {

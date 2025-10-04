@@ -37,7 +37,9 @@ async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
                     cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
                 };
 
-                Instance { position, rotation }
+                let scale = 1.0;
+
+                Instance { position, rotation, scale}
             })
         })
         .collect::<Vec<Instance>>();
