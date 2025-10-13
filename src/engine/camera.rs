@@ -154,7 +154,7 @@ pub struct CameraInfo {
 impl CameraInfo {
     pub fn new(config: CameraConfig) -> Self {
         let uniform = CameraUniform::new();
-        let controller = CameraController::new(0.05);
+        let controller = CameraController::new(0.1);
 
         Self {
             config,

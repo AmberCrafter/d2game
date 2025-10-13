@@ -112,8 +112,8 @@ version = "1.0.0"
 name = "MyGame grapher"
 
 [resources]
-[resources.shaders.backgound]
-filename = "backgound.wgsl"
+[resources.shaders.background]
+filename = "background.wgsl"
 vertex_entry = "vs_main"
 fragment_entry = "fs_main"
 
@@ -122,51 +122,120 @@ filename = "item.wgsl"
 vertex_entry = "vs_main"
 fragment_entry = "fs_main"
 
+[resources.shaders.player_gltf]
+filename = "player_gltf.wgsl"
+vertex_entry = "vs_main"
+fragment_entry = "fs_main"
+
 [resources.vertexbuffers.vertex]
 layouts = [
-    {location = 0, format = "Float32x3"},
-    {location = 1, format = "Float32x2"},
-    {location = 2, format = "Float32x3"},
+    { location = 0, format = "Float32x3" },
+    { location = 1, format = "Float32x2" },
+    { location = 2, format = "Float32x3" },
 ]
 mode = "VERTEX"
 
 [resources.vertexbuffers.instance]
 layouts = [
-    {location = 5, format = "Float32x4"},
-    {location = 6, format = "Float32x4"},
-    {location = 7, format = "Float32x4"},
-    {location = 8, format = "Float32x4"},
+    { location = 5, format = "Float32x4" },
+    { location = 6, format = "Float32x4" },
+    { location = 7, format = "Float32x4" },
+    { location = 8, format = "Float32x4" },
 ]
 mode = "INSTANCE"
 
 [resources.bindgroups.camera]
-entries = [
-    {binding = 0, ty = "Uniform", visibility = "Vertex" },
-]
+entries = [{ binding = 0, ty = "Uniform", visibility = "Vertex" }]
+usgae = ["UNIFORM", "COPY_DST"]
 
-[resources.bindgroups.texture]
+[resources.bindgroups.bg_texture]
 entries = [
-    {binding = 0, ty = "Texture", visibility = "Fragment" },
-    {binding = 1, ty = "Sampler", visibility = "Fragment" },
+    { name = "diffuse_texture", binding = 8, ty = "Texture", visibility = "Fragment" },
+    { name = "diffuse_sampler", binding = 9, ty = "Sampler", visibility = "Fragment" },
 ]
+usgae = ["UNIFORM", "COPY_DST"]
+
+[resources.bindgroups.player_texture]
+entries = [
+    { name = "ambient", binding = 0, ty = "Uniform", visibility = "Fragment" },
+    { name = "diffuse", binding = 1, ty = "Uniform", visibility = "Fragment" },
+    { name = "specular", binding = 2, ty = "Uniform", visibility = "Fragment" },
+    { name = "shininess", binding = 3, ty = "Uniform", visibility = "Fragment" },
+    { name = "dissolve", binding = 4, ty = "Uniform", visibility = "Fragment" },
+    { name = "optical_density", binding = 5, ty = "Uniform", visibility = "Fragment" },
+    { name = "illumination_model", binding = 18, ty = "Uniform", visibility = "Fragment" },
+]
+usgae = ["UNIFORM", "COPY_DST"]
+
+[resources.bindgroups.player_gltf_texture]
+entries = [
+    { name = "base_color", binding = 0, ty = "Uniform", visibility = "Fragment" },
+    { name = "metallic", binding = 1, ty = "Uniform", visibility = "Fragment" },
+    { name = "roughness", binding = 2, ty = "Uniform", visibility = "Fragment" },
+]
+usgae = ["UNIFORM", "COPY_DST"]
+
+[resources.bindgroups.obj_texture]
+entries = [
+    { name = "ambient", binding = 0, ty = "Uniform", visibility = "Fragment" },
+    { name = "diffuse", binding = 1, ty = "Uniform", visibility = "Fragment" },
+    { name = "specular", binding = 2, ty = "Uniform", visibility = "Fragment" },
+    { name = "shininess", binding = 3, ty = "Uniform", visibility = "Fragment" },
+    { name = "dissolve", binding = 4, ty = "Uniform", visibility = "Fragment" },
+    { name = "optical_density", binding = 5, ty = "Uniform", visibility = "Fragment" },
+    { name = "ambient_texture", binding = 6, ty = "Texture", visibility = "Fragment" },
+    { name = "ambient_sampler", binding = 7, ty = "Sampler", visibility = "Fragment" },
+    { name = "diffuse_texture", binding = 8, ty = "Texture", visibility = "Fragment" },
+    { name = "diffuse_sampler", binding = 9, ty = "Sampler", visibility = "Fragment" },
+    { name = "specular_texture", binding = 10, ty = "Texture", visibility = "Fragment" },
+    { name = "specular_sampler", binding = 11, ty = "Sampler", visibility = "Fragment" },
+    { name = "normal_texture", binding = 12, ty = "Texture", visibility = "Fragment" },
+    { name = "normal_sampler", binding = 13, ty = "Sampler", visibility = "Fragment" },
+    { name = "shininess_texture", binding = 14, ty = "Texture", visibility = "Fragment" },
+    { name = "shininess_sampler", binding = 15, ty = "Sampler", visibility = "Fragment" },
+    { name = "dissolve_texture", binding = 16, ty = "Texture", visibility = "Fragment" },
+    { name = "dissolve_sampler", binding = 17, ty = "Sampler", visibility = "Fragment" },
+    { name = "illumination_model", binding = 18, ty = "Uniform", visibility = "Fragment" },
+]
+usgae = ["UNIFORM", "COPY_DST"]
+
+[resources.bindgroups.gltf_texture]
+entries = [
+    { name = "base_color", binding = 0, ty = "Uniform", visibility = "Fragment" },
+    { name = "metallic", binding = 1, ty = "Uniform", visibility = "Fragment" },
+    { name = "roughness", binding = 2, ty = "Uniform", visibility = "Fragment" },
+    { name = "base_color_texture", binding = 3, ty = "Texture", visibility = "Fragment" },
+    { name = "base_color_sampler", binding = 4, ty = "Sampler", visibility = "Fragment" },
+    { name = "metallic_roughness_texture", binding = 5, ty = "Texture", visibility = "Fragment" },
+    { name = "metallic_roughness_sampler", binding = 6, ty = "Sampler", visibility = "Fragment" },
+    { name = "normal_texture", binding = 7, ty = "Texture", visibility = "Fragment" },
+    { name = "normal_sampler", binding = 8, ty = "Sampler", visibility = "Fragment" },
+    { name = "occlusion_texture", binding = 9, ty = "Texture", visibility = "Fragment" },
+    { name = "occlusion_sampler", binding = 10, ty = "Sampler", visibility = "Fragment" },
+    { name = "emissive_factor", binding = 11, ty = "Uniform", visibility = "Fragment" },
+    { name = "emissive_texture", binding = 12, ty = "Texture", visibility = "Fragment" },
+    { name = "emissive_sampler", binding = 13, ty = "Sampler", visibility = "Fragment" },
+]
+usgae = ["UNIFORM", "COPY_DST"]
 
 [pipelines]
-[pipelines.backgound]
-shader = "backgound"
+[pipelines.background]
+shader = "background"
 depth_texture = true
-vertex_buffer_layouts = [
-    "vertex",
-]
-bind_group_layouts = ["texture"]
+vertex_buffer_layouts = ["vertex"]
+bind_group_layouts = ["bg_texture", "camera"]
 
 [pipelines.item]
 shader = "item"
 depth_texture = true
-vertex_buffer_layouts = [
-    "vertex",
-    "instance",
-]
-bind_group_layouts = ["texture", "cam"]
+vertex_buffer_layouts = ["vertex", "instance"]
+bind_group_layouts = ["player_texture", "camera"]
+
+[pipelines.player]
+shader = "player_gltf"
+depth_texture = true
+vertex_buffer_layouts = ["vertex", "instance"]
+bind_group_layouts = ["player_gltf_texture", "camera"]
     "#;
 
     #[test]

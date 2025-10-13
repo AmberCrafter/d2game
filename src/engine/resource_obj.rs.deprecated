@@ -1,21 +1,57 @@
-use std::{io::Cursor, path::PathBuf, sync::{Arc, Mutex}};
-
+use std::{io::Cursor, path::PathBuf};
+// use cfg_if::cfg_if;
 use crate::engine::{model, texture};
+// use tokio::io::AsyncBufReadExt;
 use wgpu::util::DeviceExt;
 
+// #[cfg(target_arch = "wasm32")]
+// fn format_url(file_name: &str) -> reqwest::Url {
+//     let window = web_sys::window().unwrap();
+//     let location = window.location();
+//     let base = reqwest::Url::parse(&format!(
+//         "{}/{}/",
+//         location.origin().unwrap(),
+//         option_env!("RES_PATH").unwrap_or("res"),
+//     ))
+//     .unwrap();
+//     base.join(file_name).unwrap()
+// }
+
 pub async fn load_string(file_name: &str) -> anyhow::Result<String> {
+    // cfg_if! {
+    //     if #[cfg(target_arch = "wasm32")] {
+    //         let url = format_url(file_name);
+    //         let txt = reqwest::get(url)
+    //             .await?
+    //             .text()
+    //             .await?;
+    //     } else {
     let path = std::path::Path::new(env!("OUT_DIR"))
         .join("res")
         .join(file_name);
     let txt = std::fs::read_to_string(path)?;
+    //     }
+    // }
+
     Ok(txt)
 }
 
 pub async fn load_binary(file_name: &str) -> anyhow::Result<Vec<u8>> {
+    // cfg_if! {
+    //     if #[cfg(target_arch = "wasm32")] {
+    //         let url = format_url(file_name);
+    //         let data = reqwest::get(url)
+    //             .await?
+    //             .bytes()
+    //             .await?
+    //             .to_vec();
+    //     } else {
     let path = std::path::Path::new(env!("OUT_DIR"))
         .join("res")
         .join(file_name);
     let data = std::fs::read(path)?;
+    //     }
+    // }
 
     Ok(data)
 }
@@ -304,7 +340,7 @@ pub async fn load_obj_model(
             entries: &entries,
         });
 
-        materials.push(Arc::new(Mutex::new(model::ObjMaterial {
+        materials.push(model::Material {
             name: mtl.name,
             ambient,
             diffuse,
@@ -319,7 +355,7 @@ pub async fn load_obj_model(
             dissolve_texture,
             illumination_model,
             bind_group: Some(bind_group),
-        })) as Arc<_>);
+        });
     }
 
     let mut meshes = Vec::new();
@@ -371,335 +407,4 @@ pub async fn load_obj_model(
     }
 
     Ok(model::Model { meshes, materials })
-}
-
-pub async fn load_gltf_model(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    layout: &wgpu::BindGroupLayout,
-    file_name: &str,
-) -> anyhow::Result<model::Model> {
-    let path = std::path::Path::new(env!("OUT_DIR"))
-        .join("res")
-        .join(file_name);
-    let (document, buffers, images) = gltf::import(path)?;
-
-    let mut materials = Vec::new();
-    for mtl in document.materials() {
-        let pbr = mtl.pbr_metallic_roughness();
-        let mut entries = Vec::new();
-
-        /*
-           unimplement list
-           - ior
-        */
-
-        // 0
-        let base_color = if let base_color = pbr.base_color_factor() {
-            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("[{file_name}] base_color")),
-                contents: unsafe { base_color.align_to::<u8>().1 },
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
-            Some(buffer)
-        } else {
-            None
-        };
-        if let Some(buffer) = base_color.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            });
-        };
-
-        // 1
-        let metallic = if let metallic = pbr.metallic_factor() {
-            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("[{file_name}] metallic")),
-                contents: &metallic.to_ne_bytes(),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
-            Some(buffer)
-        } else {
-            None
-        };
-        if let Some(buffer) = metallic.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 1,
-                resource: buffer.as_entire_binding(),
-            });
-        };
-
-        // 2
-        let roughness = if let roughness = pbr.roughness_factor() {
-            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("[{file_name}] roughness")),
-                contents: &roughness.to_ne_bytes(),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
-            Some(buffer)
-        } else {
-            None
-        };
-        if let Some(buffer) = roughness.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 2,
-                resource: buffer.as_entire_binding(),
-            });
-        };
-
-        // 3, 4
-        let base_color_texture = if let Some(info) = pbr.base_color_texture() {
-            let base_color_texture = texture::Texture::load_texture_from_gltf(
-                device,
-                queue,
-                info.texture().name(),
-                &info.texture(),
-                &images,
-            )?;
-            Some(base_color_texture)
-        } else {
-            None
-        };
-        if let Some(texture) = base_color_texture.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            });
-            entries.push(wgpu::BindGroupEntry {
-                binding: 4,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            });
-        }
-
-        // 5, 6
-        let metallic_roughness_texture = if let Some(info) = pbr.metallic_roughness_texture() {
-            let metallic_roughness_texture = texture::Texture::load_texture_from_gltf(
-                device,
-                queue,
-                info.texture().name(),
-                &info.texture(),
-                &images,
-            )?;
-            Some(metallic_roughness_texture)
-        } else {
-            None
-        };
-        if let Some(texture) = metallic_roughness_texture.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 5,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            });
-            entries.push(wgpu::BindGroupEntry {
-                binding: 6,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            });
-        }
-
-        // 7, 8
-        let normal_texture = if let Some(info) = mtl.normal_texture() {
-            let normal_texture = texture::Texture::load_texture_from_gltf(
-                device,
-                queue,
-                info.texture().name(),
-                &info.texture(),
-                &images,
-            )?;
-            Some(normal_texture)
-        } else {
-            None
-        };
-        if let Some(texture) = normal_texture.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 7,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            });
-            entries.push(wgpu::BindGroupEntry {
-                binding: 8,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            });
-        }
-
-        // 9, 10
-        let occlusion_texture = if let Some(info) = mtl.occlusion_texture() {
-            let occlusion_texture = texture::Texture::load_texture_from_gltf(
-                device,
-                queue,
-                info.texture().name(),
-                &info.texture(),
-                &images,
-            )?;
-            Some(occlusion_texture)
-        } else {
-            None
-        };
-        if let Some(texture) = occlusion_texture.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 9,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            });
-            entries.push(wgpu::BindGroupEntry {
-                binding: 10,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            });
-        }
-
-        // 11
-        let emissive_factor = if let emissive_factor = mtl.emissive_factor() {
-            let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("[{file_name}] emissive_factor")),
-                contents: unsafe { emissive_factor.align_to::<u8>().1 },
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
-            Some(buffer)
-        } else {
-            None
-        };
-        if let Some(buffer) = emissive_factor.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 11,
-                resource: buffer.as_entire_binding(),
-            });
-        };
-
-        // 12, 13
-        let emissive_texture = if let Some(info) = mtl.emissive_texture() {
-            let emissive_texture = texture::Texture::load_texture_from_gltf(
-                device,
-                queue,
-                info.texture().name(),
-                &info.texture(),
-                &images,
-            )?;
-            Some(emissive_texture)
-        } else {
-            None
-        };
-        if let Some(texture) = emissive_texture.as_ref() {
-            entries.push(wgpu::BindGroupEntry {
-                binding: 12,
-                resource: wgpu::BindingResource::TextureView(&texture.view),
-            });
-            entries.push(wgpu::BindGroupEntry {
-                binding: 13,
-                resource: wgpu::BindingResource::Sampler(&texture.sampler),
-            });
-        }
-
-        // println!("[Debug] {:?}({:?}) {:#?}", file!(), line!(), entries);
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(&format!("{file_name} bind_group")),
-            layout,
-            entries: &entries,
-        });
-
-        materials.push(Arc::new(Mutex::new(model::GltfMaterial {
-            name: mtl
-                .name()
-                .unwrap_or(&format!("{}/{}", file_name, "material"))
-                .to_string(),
-            base_color,
-            metallic,
-            roughness,
-            base_color_texture,
-            metallic_roughness_texture,
-            normal_texture,
-            occlusion_texture,
-            emissive_factor,
-            emissive_texture,
-
-            bind_group: Some(bind_group),
-        })) as Arc<_>);
-    }
-
-    let mut meshes = Vec::new();
-    for node in document.nodes() {
-        let transform = cgmath::Matrix4::from(node.transform().matrix());
-        if let Some(mesh) = node.mesh() {
-            let name = format!(
-                "{}",
-                mesh.name()
-                    .unwrap_or(&format!("{}/mesh_{}", file_name, mesh.index()))
-            );
-
-            let mut vertices = Vec::new();
-            let mut indices = Vec::new();
-            let mut material_idx = 0;
-
-            // FIXME: material for each primitive
-            for prim in mesh.primitives() {
-                let r = prim.reader(|buffer| Some(&buffers[buffer.index()]));
-
-                let p_indices = r.read_indices().unwrap().into_u32();
-                let positions = r.read_positions().unwrap();
-                let texcoords = r.read_tex_coords(0).unwrap().into_f32();
-                let normals = r.read_normals().unwrap();
-
-                for ((position, tex_coord), normal) in positions.zip(texcoords).zip(normals) {
-                    let position = cgmath::Vector4::new(position[0], position[1], position[2], 1.0);
-                    let position = transform * position;
-                    let position = position.truncate().into();
-                    
-                    vertices.push(model::ModelVertex {
-                        position,
-                        tex_coord,
-                        normal,
-                    });
-                }
-
-                indices.extend(p_indices);
-                material_idx = prim.material().index().unwrap_or(0);
-            }
-            let vertices_data = unsafe { vertices.align_to::<u8>().1 };
-            let indices_data = unsafe { indices.align_to::<u8>().1 };
-
-            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{file_name} Vertex buffer")),
-                contents: vertices_data,
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-
-            let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{file_name} Index buffer")),
-                contents: indices_data,
-                usage: wgpu::BufferUsages::INDEX,
-            });
-
-            let mesh = model::Mesh {
-                name: name,
-                vertex_buffer,
-                index_buffer,
-                num_elements: indices.len() as u32,
-                material: material_idx,
-            };
-
-            meshes.push(mesh);
-        }
-    }
-
-    // for mesh in document.meshes() {
-    // ...
-    // }
-
-    Ok(model::Model { meshes, materials })
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn dev_case() {
-        // let filename = "player_walk.gltf";
-        // let filename = "player_walk_texture/player_walk_texture.gltf";
-
-        // let Ok(rt) = tokio::runtime::Runtime::new() else {
-        //     panic!("System Error");
-        // };
-
-        // let model = rt
-        //     .block_on(load_model(filename))
-        //     .expect("load model failed");
-
-        // println!("{:?}", model);
-    }
 }

@@ -11,15 +11,11 @@ pub mod texture;
 pub mod vertex;
 
 use std::{
-    cell::LazyCell,
     collections::HashMap,
     ops::Range,
-    pin::Pin,
-    sync::{Arc, LazyLock, Mutex, OnceLock},
+    sync::{Arc, LazyLock, Mutex},
 };
 
-use cgmath::{InnerSpace, Matrix4, Rotation3};
-use wgpu::util::DeviceExt;
 use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 
 use winit::{dpi::PhysicalSize, window::Window};
@@ -30,7 +26,6 @@ use crate::{
         bindgroup::BindGroupInfo,
         camera::{CameraConfig, CameraInfo},
         config::GraphConfig,
-        instance::Instance,
         model::{DrawModel, Model},
         module::WgpuAppModule,
         render_pipeline::RenderPipelineInfo,
@@ -38,7 +33,7 @@ use crate::{
         texture::{Texture, TextureInfo},
         vertex::VertexBufferInfo,
     },
-    item, player,
+    player,
 };
 
 pub enum UserDataType {
@@ -194,9 +189,9 @@ impl WgpuAppAction for WgpuApp {
     }
 
     fn keyboard_input(&mut self, event: &winit::event::KeyEvent, _is_synthetic: bool) -> bool {
-        // self.camera.controller.process_event(event)
+        self.camera.controller.process_event(event)
 
-        true
+        // true
     }
 
     fn update(&mut self, dt: std::time::Duration) {
@@ -262,7 +257,6 @@ impl WgpuAppAction for WgpuApp {
                 }),
                 ..Default::default()
             });
-
 
             for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
                 // println!("[Debug] {:?}({:?}) {data_tag:?}", file!(), line!());

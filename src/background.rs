@@ -6,11 +6,7 @@ use tokio::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 use crate::engine::{
-    UserDataType, WgpuApp,
-    instance::Instance,
-    model::{Material, Mesh, Model, ModelVertex},
-    module::WgpuAppModule,
-    resource::load_texture,
+    instance::Instance, model::{Mesh, Model, ModelVertex, ObjMaterial}, module::WgpuAppModule, resource::load_texture, UserDataType, WgpuApp
 };
 
 const BACKGOUND_IMGAE_PATH: &str = "grassland.jpg";
@@ -100,12 +96,12 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
             num_elements: INDICES.len() as u32,
             material: 0,
         }],
-        materials: vec![Material {
+        materials: vec![Arc::new(std::sync::Mutex::new( ObjMaterial {
             name: "Backgound".to_string(),
             diffuse_texture: Some(background_texture),
             bind_group: Some(background_texture_bind_group),
             ..Default::default()
-        }],
+        })) as Arc<_>],
     };
 
     let instances = {
@@ -153,7 +149,7 @@ impl WgpuAppModule for BackgroundModule {
     }
 
     async fn probe(&mut self, app: Arc<Mutex<WgpuApp>>) -> anyhow::Result<()> {
-        load_background(app.clone()).await;
+        // load_background(app.clone()).await;
         Ok(())
     }
 }

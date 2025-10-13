@@ -11,7 +11,7 @@ async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
     // let texture_bind_group_layout = app.texture.bind_group_layout.as_ref().unwrap();
     let texture_bind_group_layout = app.graph_resource.bind_group_info.get("texture").unwrap();
 
-    let obj_model = resource::load_model(
+    let obj_model = resource::load_obj_model(
         &app.app_surface.device,
         &app.app_surface.queue,
         texture_bind_group_layout,
@@ -82,7 +82,7 @@ impl WgpuAppModule for ItemModule {
     }
 
     async fn probe(&mut self, app: Arc<tokio::sync::Mutex<WgpuApp>>) -> anyhow::Result<()> {
-        // load_resource(app.clone()).await;
+        load_resource(app.clone()).await;
         Ok(())
     }
 

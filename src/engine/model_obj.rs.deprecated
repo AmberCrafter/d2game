@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Range, sync::{Arc, Mutex}};
+use std::ops::Range;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -10,7 +10,7 @@ pub struct ModelVertex {
 
 #[allow(unused)]
 #[derive(Debug, Default)]
-pub struct ObjMaterial {
+pub struct Material {
     pub name: String,
     pub ambient: Option<wgpu::Buffer>,
     pub diffuse: Option<wgpu::Buffer>,
@@ -31,47 +31,6 @@ pub struct ObjMaterial {
 }
 
 #[allow(unused)]
-#[derive(Debug, Default)]
-pub struct GltfMaterial {
-    pub name: String,
-    pub base_color: Option<wgpu::Buffer>,
-    pub metallic: Option<wgpu::Buffer>,
-    pub roughness: Option<wgpu::Buffer>,
-    pub base_color_texture: Option<crate::engine::texture::Texture>,
-    pub metallic_roughness_texture: Option<crate::engine::texture::Texture>,
-    pub normal_texture: Option<crate::engine::texture::Texture>,
-    pub occlusion_texture: Option<crate::engine::texture::Texture>,
-    pub emissive_factor: Option<wgpu::Buffer>,
-    pub emissive_texture: Option<crate::engine::texture::Texture>,
-
-    pub bind_group: Option<wgpu::BindGroup>,
-}
-
-pub trait Material {
-    fn get_bind_group(&self) -> Option<&wgpu::BindGroup> {
-        None
-    }
-}
-
-impl Debug for dyn Material + Send + Sync {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl Material for ObjMaterial {
-    fn get_bind_group(&self) -> Option<&wgpu::BindGroup> {
-        self.bind_group.as_ref()
-    }
-}
-
-impl Material for GltfMaterial {
-    fn get_bind_group(&self) -> Option<&wgpu::BindGroup> {
-        self.bind_group.as_ref()
-    }
-}
-
-#[allow(unused)]
 #[derive(Debug)]
 pub struct Mesh {
     pub name: String,
@@ -84,7 +43,7 @@ pub struct Mesh {
 #[derive(Debug)]
 pub struct Model {
     pub meshes: Vec<Mesh>,
-    pub materials: Vec<Arc<Mutex<dyn Material + Send + Sync>>>,
+    pub materials: Vec<Material>,
 }
 
 #[allow(unused)]
@@ -92,13 +51,13 @@ pub trait DrawModel<'a> {
     fn draw_mesh(
         &mut self,
         mesh: &'a Mesh,
-        material: Arc<Mutex<dyn Material>>,
+        material: &'a Material,
         camera_bind_group: &'a wgpu::BindGroup,
     );
     fn draw_mesh_instanced(
         &mut self,
         mesh: &'a Mesh,
-        material: Arc<Mutex<dyn Material>>,
+        material: &'a Material,
         instances: Range<u32>,
         camera_bind_group: &'a wgpu::BindGroup,
     );
@@ -116,7 +75,7 @@ impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
     fn draw_mesh(
         &mut self,
         mesh: &'b Mesh,
-        material: Arc<Mutex<dyn Material>>,
+        material: &'b Material,
         camera_bind_group: &'b wgpu::BindGroup,
     ) {
         self.draw_mesh_instanced(mesh, material, 0..1, camera_bind_group);
@@ -125,14 +84,14 @@ impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
     fn draw_mesh_instanced(
         &mut self,
         mesh: &'b Mesh,
-        material: Arc<Mutex<dyn Material>>,
+        material: &'b Material,
         instances: Range<u32>,
         camera_bind_group: &'b wgpu::BindGroup,
     ) {
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
-        self.set_bind_group(0, material.lock().unwrap().get_bind_group(), &[]);
+        self.set_bind_group(0, &material.bind_group, &[]);
         self.set_bind_group(1, camera_bind_group, &[]);
         self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
@@ -150,12 +109,8 @@ impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
         // println!("[Debug] {:?}({:?}) {:?}", file!(), line!(), model);
         
         for mesh in model.meshes.iter() {
-            // println!("[Debug] {:?}({:?}) {:?}", file!(), line!(), mesh.name);
-            // if &mesh.name == "Sphere.001" {continue;}
-            // if &mesh.name == "Sphere.002" {continue;}
-
             let material = &model.materials[mesh.material];
-            self.draw_mesh_instanced(&mesh, material.clone(), instances.clone(), camera_bind_group);
+            self.draw_mesh_instanced(&mesh, material, instances.clone(), camera_bind_group);
         }
     }
 }

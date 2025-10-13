@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+
 pub struct TextureInfo {
     pub depth_texture: Option<Texture>,
 }
@@ -184,5 +186,106 @@ impl Texture {
             view,
             sampler,
         }
+    }
+
+    pub fn load_texture_from_gltf(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        label: Option<&str>,
+        texture: &gltf::Texture,
+        images: &Vec<gltf::image::Data>
+    ) -> anyhow::Result<Self> {
+        let img_idx = texture.source().index();
+        let sampler = texture.sampler();
+        let img_data = &images[img_idx];
+
+        if img_data.format != gltf::image::Format::R8G8B8A8 {
+            return Err(anyhow!("Not support image format!"));
+        }
+
+        let texture_size = wgpu::Extent3d {
+            width: img_data.width,
+            height: img_data.height,
+            depth_or_array_layers: 1,
+        };
+
+        let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+        let texel = &img_data.pixels;
+
+        let texture = device.create_texture(&wgpu::wgt::TextureDescriptor {
+            label,
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let pixel_byte = Self::single_pixel_bytes(texture.format());
+
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &texel,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(pixel_byte * texture_size.width),
+                rows_per_image: Some(texture_size.height),
+            },
+            texture_size,
+        );
+
+        let texture_view = texture.create_view(&wgpu::wgt::TextureViewDescriptor {
+            // format: Some(format.remove_srgb_suffix()),
+            ..Default::default()
+        });
+
+        let get_wrapping_mode = |gltf_mode: gltf::texture::WrappingMode| {
+            match gltf_mode {
+                gltf::texture::WrappingMode::Repeat => wgpu::AddressMode::MirrorRepeat,
+                gltf::texture::WrappingMode::MirroredRepeat => wgpu::AddressMode::MirrorRepeat,
+                gltf::texture::WrappingMode::ClampToEdge => wgpu::AddressMode::ClampToEdge,
+            }
+        };
+
+        let get_magfilter_mode = |gltf_mode: gltf::texture::MagFilter | {
+            match gltf_mode {
+                gltf::texture::MagFilter::Linear => wgpu::FilterMode::Linear,
+                gltf::texture::MagFilter::Nearest => wgpu::FilterMode::Nearest
+            }
+        };
+
+        let get_minfilter_mode = |gltf_mode: gltf::texture::MinFilter | {
+            match gltf_mode {
+                gltf::texture::MinFilter::Linear => (wgpu::FilterMode::Linear, wgpu::FilterMode::Linear),
+                gltf::texture::MinFilter::Nearest => (wgpu::FilterMode::Nearest, wgpu::FilterMode::Nearest),
+                gltf::texture::MinFilter::LinearMipmapLinear => (wgpu::FilterMode::Linear, wgpu::FilterMode::Linear),
+                gltf::texture::MinFilter::LinearMipmapNearest => (wgpu::FilterMode::Linear, wgpu::FilterMode::Nearest),
+                gltf::texture::MinFilter::NearestMipmapLinear => (wgpu::FilterMode::Nearest, wgpu::FilterMode::Linear),
+                gltf::texture::MinFilter::NearestMipmapNearest => (wgpu::FilterMode::Nearest, wgpu::FilterMode::Nearest),
+            }
+        };
+
+        let texture_sampler = device.create_sampler(&wgpu::wgt::SamplerDescriptor {
+            address_mode_u: get_wrapping_mode(sampler.wrap_s()),
+            address_mode_v: get_wrapping_mode(sampler.wrap_t()),
+            address_mode_w: wgpu::AddressMode::MirrorRepeat,
+            mag_filter: get_magfilter_mode(sampler.mag_filter().unwrap_or(gltf::texture::MagFilter::Linear)),
+            min_filter: get_minfilter_mode(sampler.min_filter().unwrap_or(gltf::texture::MinFilter::Nearest)).0,
+            mipmap_filter: get_minfilter_mode(sampler.min_filter().unwrap_or(gltf::texture::MinFilter::Nearest)).1,
+            ..Default::default()
+        });
+
+        Ok(Self {
+            texture,
+            view: texture_view,
+            sampler: texture_sampler,
+        })
     }
 }

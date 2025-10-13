@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cgmath::{Matrix4, Rotation3};
+use cgmath::{InnerSpace, Matrix4, Rotation3};
 use wgpu::util::DeviceExt;
 
 use crate::engine::{UserDataType, WgpuApp, instance::Instance, module::WgpuAppModule, resource};
@@ -12,23 +12,14 @@ async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
     let texture_bind_group_layout = app
         .graph_resource
         .bind_group_info
-        .get("player_gltf_texture")
+        .get("player_texture")
         .unwrap();
 
-    // let obj_model = resource::load_obj_model(
-    //     &app.app_surface.device,
-    //     &app.app_surface.queue,
-    //     texture_bind_group_layout,
-    //     "player.obj",
-    // )
-    // .await
-    // .unwrap();
-
-    let obj_model = resource::load_gltf_model(
+    let obj_model = resource::load_model(
         &app.app_surface.device,
         &app.app_surface.queue,
         texture_bind_group_layout,
-        "player_walk.gltf",
+        "player.obj",
     )
     .await
     .unwrap();
