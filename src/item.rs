@@ -7,6 +7,7 @@ use wgpu::util::DeviceExt;
 use crate::engine::{UserDataType, WgpuApp, instance::Instance, module::WgpuAppModule, resource};
 
 async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
+    println!("[Debug] {:?}({:?})", file!(), line!());
     let app = app.lock().await;
     // let texture_bind_group_layout = app.texture.bind_group_layout.as_ref().unwrap();
     let texture_bind_group_layout = app.graph_resource.bind_group_info.get("texture").unwrap();
@@ -86,7 +87,7 @@ impl WgpuAppModule for ItemModule {
         Ok(())
     }
 
-    fn update(&mut self, dt: std::time::Duration) -> anyhow::Result<()> {
+    fn update(&mut self, queue: &wgpu::Queue, dt: std::time::Duration) -> anyhow::Result<()> {
         Ok(())
     }
 }

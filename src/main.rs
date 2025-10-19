@@ -6,6 +6,7 @@ mod background;
 mod engine;
 mod item;
 mod player;
+mod gltf_parser;
 
 fn main() -> anyhow::Result<()> {
     // println!("Hello, world!");

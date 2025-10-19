@@ -1,4 +1,12 @@
-use std::{fmt::Debug, ops::Range, sync::{Arc, Mutex}};
+use std::{
+    fmt::Debug,
+    ops::Range,
+    sync::{Arc, Mutex},
+};
+
+use cgmath::SquareMatrix;
+
+use crate::engine::vertex;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -72,13 +80,154 @@ impl Material for GltfMaterial {
 }
 
 #[allow(unused)]
+#[derive(Debug, Default)]
+pub struct Animation {
+    pub name: String,
+    pub translations: Option<Vec<(f32, [f32; 3])>>,
+    pub rotations: Option<Vec<(f32, [f32; 4])>>,
+    pub scales: Option<Vec<(f32, [f32; 3])>>,
+    pub period: f32,
+    pub do_loop: bool,
+}
+
+impl Animation {
+    pub fn update_period(&mut self, period: f32) -> anyhow::Result<()> {
+        self.period = period;
+        Ok(())
+    }
+
+    pub fn set_translations(&mut self, translations: Vec<(f32, [f32; 3])>) -> anyhow::Result<()> {
+        self.translations.replace(translations);
+        Ok(())
+    }
+
+    pub fn set_rotations(&mut self, rotations: Vec<(f32, [f32; 4])>) -> anyhow::Result<()> {
+        self.rotations.replace(rotations);
+        Ok(())
+    }
+
+    pub fn set_scales(&mut self, scales: Vec<(f32, [f32; 3])>) -> anyhow::Result<()> {
+        self.scales.replace(scales);
+        Ok(())
+    }
+
+    #[inline]
+    fn get_time(&self, time: f32) -> f32 {
+        if self.do_loop {
+            time % self.period
+        } else {
+            time.min(self.period)
+        }
+    }
+
+    fn get_translation_matrix(&self, time: f32) -> cgmath::Matrix4<f32> {
+        if self.translations.is_none() || self.period == 0.0 {
+            return cgmath::Matrix4::identity();
+        }
+        let tick = self.get_time(time);
+        let mut prev = &self.translations.as_ref().unwrap()[0];
+        let mut curr = prev;
+        // linear
+        for val in self.translations.as_ref().unwrap() {
+            if tick > val.0 {
+                prev = val;
+                continue;
+            }
+            curr = val;
+        }
+
+        let weight = (tick - prev.0) / (curr.0 - prev.0);
+        let translation = [
+            prev.1[0] + (curr.1[0] - prev.1[0]) * weight,
+            prev.1[1] + (curr.1[1] - prev.1[1]) * weight,
+            prev.1[2] + (curr.1[2] - prev.1[2]) * weight,
+        ]
+        .into();
+
+        cgmath::Matrix4::from_translation(translation)
+    }
+
+    fn get_rotation_matrix(&self, time: f32) -> cgmath::Matrix4<f32> {
+        if self.rotations.is_none() || self.period == 0.0 {
+            return cgmath::Matrix4::identity();
+        }
+        let tick = self.get_time(time);
+        let mut prev = &self.rotations.as_ref().unwrap()[0];
+        let mut curr = prev;
+        // linear
+        for val in self.rotations.as_ref().unwrap() {
+            if tick > val.0 {
+                prev = val;
+                continue;
+            }
+            curr = val;
+        }
+
+        let weight = (tick - prev.0) / (curr.0 - prev.0);
+        let prev_quat = cgmath::Quaternion::new(prev.1[3], prev.1[0], prev.1[1], prev.1[2]);
+        let curr_quat = cgmath::Quaternion::new(curr.1[3], curr.1[0], curr.1[1], curr.1[2]);
+        let rotation = prev_quat.slerp(curr_quat, weight);
+        cgmath::Matrix4::from(rotation)
+    }
+
+    fn get_scale_matrix(&self, time: f32) -> cgmath::Matrix4<f32> {
+        if self.scales.is_none() || self.period == 0.0 {
+            return cgmath::Matrix4::identity();
+        }
+        let tick = self.get_time(time);
+        let mut prev = &self.scales.as_ref().unwrap()[0];
+        let mut curr = prev;
+        // linear
+        for val in self.scales.as_ref().unwrap() {
+            if tick > val.0 {
+                prev = val;
+                continue;
+            }
+            curr = val;
+        }
+
+        let weight = (tick - prev.0) / (curr.0 - prev.0);
+
+        let scale = [
+            prev.1[0] + (curr.1[0] - prev.1[0]) * weight,
+            prev.1[1] + (curr.1[1] - prev.1[1]) * weight,
+            prev.1[2] + (curr.1[2] - prev.1[2]) * weight,
+        ];
+
+        cgmath::Matrix4::from_nonuniform_scale(scale[0], scale[1], scale[2])
+    }
+
+    pub fn get_transform(&self, time: f32) -> anyhow::Result<cgmath::Matrix4<f32>> {
+        let translation = self.get_translation_matrix(time);
+        let rotation = self.get_rotation_matrix(time);
+        let scale = self.get_scale_matrix(time);
+
+        Ok(translation * rotation * scale)
+    }
+}
+
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Mesh {
     pub name: String,
+    pub vertex: Vec<ModelVertex>,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_elements: u32,
     pub material: usize,
+    pub animation: Option<Animation>,
+    pub uniform_transform: Mutex<Option<cgmath::Matrix4<f32>>>,
+    pub uniform_transform_buffer: Option<wgpu::Buffer>,
+    pub uniform_transform_layout: Option<wgpu::BindGroupLayout>,
+    pub uniform_transform_bindgroup: Option<wgpu::BindGroup>,
+}
+
+impl Mesh {
+    pub fn update_transform(&self, transform: cgmath::Matrix4<f32>) {
+        let mut uniform_lock = self.uniform_transform.lock();
+        let inner = uniform_lock.as_mut().unwrap();
+        inner.replace(transform);
+    }
 }
 
 #[derive(Debug)]
@@ -91,21 +240,29 @@ pub struct Model {
 pub trait DrawModel<'a> {
     fn draw_mesh(
         &mut self,
+        queue: &wgpu::Queue,
         mesh: &'a Mesh,
         material: Arc<Mutex<dyn Material>>,
         camera_bind_group: &'a wgpu::BindGroup,
     );
     fn draw_mesh_instanced(
         &mut self,
+        queue: &wgpu::Queue,
         mesh: &'a Mesh,
         material: Arc<Mutex<dyn Material>>,
         instances: Range<u32>,
         camera_bind_group: &'a wgpu::BindGroup,
     );
 
-    fn draw_model(&mut self, model: &'a Model, camera_bind_group: &'a wgpu::BindGroup);
+    fn draw_model(
+        &mut self,
+        queue: &wgpu::Queue,
+        model: &'a Model,
+        camera_bind_group: &'a wgpu::BindGroup,
+    );
     fn draw_model_instanced(
         &mut self,
+        queue: &wgpu::Queue,
         model: &'a Model,
         instances: Range<u32>,
         camera_bind_group: &'a wgpu::BindGroup,
@@ -115,15 +272,17 @@ pub trait DrawModel<'a> {
 impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
     fn draw_mesh(
         &mut self,
+        queue: &wgpu::Queue,
         mesh: &'b Mesh,
         material: Arc<Mutex<dyn Material>>,
         camera_bind_group: &'b wgpu::BindGroup,
     ) {
-        self.draw_mesh_instanced(mesh, material, 0..1, camera_bind_group);
+        self.draw_mesh_instanced(queue, mesh, material, 0..1, camera_bind_group);
     }
 
     fn draw_mesh_instanced(
         &mut self,
+        queue: &wgpu::Queue,
         mesh: &'b Mesh,
         material: Arc<Mutex<dyn Material>>,
         instances: Range<u32>,
@@ -132,30 +291,50 @@ impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
+        let uniform_lock = mesh.uniform_transform.lock().unwrap();
+        match (
+            mesh.uniform_transform_buffer.as_ref(),
+            mesh.uniform_transform_bindgroup.as_ref(),
+            *uniform_lock,
+        ) {
+            (Some(buffer), Some(bindgroup), Some(data)) => {
+                let data =
+                    unsafe { core::mem::transmute::<cgmath::Matrix4<f32>, [u8; 64]>(data.clone()) };
+                queue.write_buffer(&buffer, 0, &data);
+                self.set_bind_group(2, bindgroup, &[]);
+            }
+            _ => {}
+        }
         self.set_bind_group(0, material.lock().unwrap().get_bind_group(), &[]);
         self.set_bind_group(1, camera_bind_group, &[]);
         self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
 
-    fn draw_model(&mut self, model: &'b Model, camera_bind_group: &'b wgpu::BindGroup) {
-        self.draw_model_instanced(model, 0..1, camera_bind_group);
+    fn draw_model(
+        &mut self,
+        queue: &wgpu::Queue,
+        model: &'b Model,
+        camera_bind_group: &'b wgpu::BindGroup,
+    ) {
+        self.draw_model_instanced(queue, model, 0..1, camera_bind_group);
     }
 
     fn draw_model_instanced(
         &mut self,
+        queue: &wgpu::Queue,
         model: &'b Model,
         instances: Range<u32>,
         camera_bind_group: &'b wgpu::BindGroup,
     ) {
-        // println!("[Debug] {:?}({:?}) {:?}", file!(), line!(), model);
-        
         for mesh in model.meshes.iter() {
-            // println!("[Debug] {:?}({:?}) {:?}", file!(), line!(), mesh.name);
-            // if &mesh.name == "Sphere.001" {continue;}
-            // if &mesh.name == "Sphere.002" {continue;}
-
             let material = &model.materials[mesh.material];
-            self.draw_mesh_instanced(&mesh, material.clone(), instances.clone(), camera_bind_group);
+            self.draw_mesh_instanced(
+                queue,
+                &mesh,
+                material.clone(),
+                instances.clone(),
+                camera_bind_group,
+            );
         }
     }
 }

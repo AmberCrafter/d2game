@@ -12,7 +12,7 @@ pub trait WgpuAppModule {
 
     async fn probe(&mut self, app: Arc<Mutex<WgpuApp>>) -> anyhow::Result<()>;
 
-    fn update(&mut self, dt: std::time::Duration) -> anyhow::Result<()> {
+    fn update(&mut self, queue: &wgpu::Queue, dt: std::time::Duration) -> anyhow::Result<()> {
         Ok(())
     }
 

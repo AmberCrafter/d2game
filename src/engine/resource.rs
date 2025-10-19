@@ -1,6 +1,7 @@
 use std::{io::Cursor, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::engine::{model, texture};
+use crate::engine::{model::{self, Animation}, texture};
+use cgmath::SquareMatrix;
 use wgpu::util::DeviceExt;
 
 pub async fn load_string(file_name: &str) -> anyhow::Result<String> {
@@ -361,16 +362,66 @@ pub async fn load_obj_model(
 
         let mesh = model::Mesh {
             name: file_name.to_string(),
+            vertex: vertices,
             vertex_buffer,
             index_buffer,
             num_elements: model.mesh.indices.len() as u32,
             material: model.mesh.material_id.unwrap_or(0),
+            animation: None,
+            uniform_transform: std::sync::Mutex::new(None),
+            uniform_transform_buffer: None,
+            uniform_transform_layout: None,
+            uniform_transform_bindgroup: None,
         };
 
         meshes.push(mesh);
     }
 
     Ok(model::Model { meshes, materials })
+}
+
+
+fn setup_transform_uniform(device: &wgpu::Device, name: &str) -> (
+    wgpu::Buffer,
+    wgpu::BindGroupLayout,
+    wgpu::BindGroup,
+) {
+    let data = cgmath::Matrix4::identity();
+
+    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some(&format!("{} transform uniform buffer", name)),
+        contents: &unsafe { core::mem::transmute::<cgmath::Matrix4<f32>, [u8; 64]>(data) },
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some(&format!("{} transform uniform bind group layout", name)),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(&format!("{} transform uniform bind group", name)),
+        layout: &bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: buffer.as_entire_binding(),
+        }],
+    });
+
+    (
+        buffer,
+        bind_group_layout,
+        bind_group
+    )
 }
 
 pub async fn load_gltf_model(
@@ -656,7 +707,7 @@ pub async fn load_gltf_model(
             let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("{file_name} Vertex buffer")),
                 contents: vertices_data,
-                usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
 
             let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -665,21 +716,73 @@ pub async fn load_gltf_model(
                 usage: wgpu::BufferUsages::INDEX,
             });
 
+            let mut animation = Animation {
+                name: format!("{}_animation", name),
+                translations: None,
+                rotations: None,
+                scales: None,
+                period: 0.0,
+                do_loop: true,
+            };
+            for doc_animation in document.animations() {
+                for channel in doc_animation.channels() {
+                    if channel.target().node().index() != node.index() { continue; }
+
+                    let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]) );
+                    let mut times = Vec::new();
+                    for input in reader.read_inputs().unwrap() {
+                        times.push(input);
+                    }
+
+                    animation.update_period(*times.last().unwrap()).unwrap();
+
+                    if let Some(output) = reader.read_outputs() {
+                        match output {
+                            gltf::animation::util::ReadOutputs::MorphTargetWeights(val) => {unimplemented!()},
+                            gltf::animation::util::ReadOutputs::Translations(val) => {
+                                let buf = times.iter().zip(val).map(|(&t, v)| {
+                                    (t, v)
+                                }).collect::<Vec<_>>();
+                                animation.set_translations(buf).unwrap();
+                            },
+                            gltf::animation::util::ReadOutputs::Rotations(val) => {
+                                let buf = times.iter().zip(val.into_f32()).map(|(&t, v)| {
+                                    (t, v)
+                                }).collect::<Vec<_>>();
+                                animation.set_rotations(buf).unwrap();
+                            },
+                            gltf::animation::util::ReadOutputs::Scales(val) => {
+                                let buf = times.iter().zip(val).map(|(&t, v)| {
+                                    (t, v)
+                                }).collect::<Vec<_>>();
+                                animation.set_scales(buf).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+
+            let (buffer, layout, bindgroup) = setup_transform_uniform(device, &name);
+
+
             let mesh = model::Mesh {
                 name: name,
+                vertex: vertices,
                 vertex_buffer,
                 index_buffer,
                 num_elements: indices.len() as u32,
                 material: material_idx,
+                animation: Some(animation),
+                uniform_transform: std::sync::Mutex::new(Some(cgmath::Matrix4::identity())),
+
+                uniform_transform_buffer: Some(buffer),
+                uniform_transform_layout: Some(layout),
+                uniform_transform_bindgroup: Some(bindgroup),
             };
 
             meshes.push(mesh);
         }
     }
-
-    // for mesh in document.meshes() {
-    // ...
-    // }
 
     Ok(model::Model { meshes, materials })
 }

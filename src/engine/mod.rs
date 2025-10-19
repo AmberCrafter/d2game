@@ -16,6 +16,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
+use tokio::runtime::Runtime;
 use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 
 use winit::{dpi::PhysicalSize, window::Window};
@@ -39,6 +40,7 @@ use crate::{
 pub enum UserDataType {
     Model(Arc<Model>, Arc<wgpu::Buffer>),
     ModelInstance(Arc<Model>, Range<u32>, Arc<wgpu::Buffer>),
+    // ModelInstanceBindGroup(Arc<Model>, Range<u32>, Arc<wgpu::Buffer>, Arc<wgpu::BindGroup>),
 }
 
 pub struct WgpuAppGraphResource {
@@ -197,7 +199,7 @@ impl WgpuAppAction for WgpuApp {
     fn update(&mut self, dt: std::time::Duration) {
         let mut module_lock = APP_MODULES.lock().unwrap();
         for ele in module_lock.iter_mut() {
-            let _ = ele.1.update(dt);
+            let _ = ele.1.update(&self.app_surface.queue, dt);
         }
 
         self.camera.update();
@@ -273,11 +275,12 @@ impl WgpuAppAction for WgpuApp {
                     match data {
                         UserDataType::Model(model, instance_buffer) => {
                             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                            render_pass.draw_model(model, self.camera.bind_group.as_ref().unwrap());
+                            render_pass.draw_model(&self.app_surface.queue, model, self.camera.bind_group.as_ref().unwrap());
                         }
                         UserDataType::ModelInstance(model, instances, instance_buffer) => {
                             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
                             render_pass.draw_model_instanced(
+                                &self.app_surface.queue,
                                 model,
                                 instances.clone(),
                                 self.camera.bind_group.as_ref().unwrap(),

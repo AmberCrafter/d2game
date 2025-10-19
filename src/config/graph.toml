@@ -66,6 +66,10 @@ entries = [
 ]
 usgae = ["UNIFORM", "COPY_DST"]
 
+[resources.bindgroups.player_transform]
+entries = [{ binding = 0, ty = "Uniform", visibility = "Vertex" }]
+usgae = ["UNIFORM", "COPY_DST"]
+
 [resources.bindgroups.obj_texture]
 entries = [
     { name = "ambient", binding = 0, ty = "Uniform", visibility = "Fragment" },
@@ -126,4 +130,4 @@ bind_group_layouts = ["player_texture", "camera"]
 shader = "player_gltf"
 depth_texture = true
 vertex_buffer_layouts = ["vertex", "instance"]
-bind_group_layouts = ["player_gltf_texture", "camera"]
+bind_group_layouts = ["player_gltf_texture", "camera", "player_transform"]

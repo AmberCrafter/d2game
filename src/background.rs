@@ -38,6 +38,7 @@ const VERTICES: &[ModelVertex] = &[
 const INDICES: &[u32] = &[0, 1, 2, 2, 1, 3];
 
 async fn load_background(app: Arc<Mutex<WgpuApp>>) {
+    println!("[Debug] {:?}({:?})", file!(), line!());
     let app = app.lock().await;
     let vertices_data = unsafe { VERTICES.align_to::<u8>().1 };
     let vertex_buffer =
@@ -91,10 +92,16 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
     let model = Model {
         meshes: vec![Mesh {
             name: "Backgound".to_string(),
+            vertex: VERTICES.to_vec(),
             vertex_buffer,
             index_buffer,
             num_elements: INDICES.len() as u32,
             material: 0,
+            animation: None,
+            uniform_transform: std::sync::Mutex::new(None),
+            uniform_transform_buffer: None,
+            uniform_transform_layout: None,
+            uniform_transform_bindgroup: None,
         }],
         materials: vec![Arc::new(std::sync::Mutex::new( ObjMaterial {
             name: "Backgound".to_string(),

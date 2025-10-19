@@ -26,6 +26,9 @@ struct CameraUniform {
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
 
+@group(2) @binding(0)
+var<uniform> transform: mat4x4f;
+
 @vertex
 fn vs_main(
     model: VertexInput,
@@ -40,7 +43,7 @@ fn vs_main(
 
     var out: VertexOutput;
     out.tex_coords = model.tex_coords;
-    out.clip_position = camera.view_proj * model_matrix * vec4f(model.position, 1.0);
+    out.clip_position = camera.view_proj * model_matrix * transform * vec4f(model.position, 1.0);
     out.norm = model.norm;
     out.view_pos = camera.view_pos.xyz;
     return out;
