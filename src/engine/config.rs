@@ -76,6 +76,7 @@ pub struct ResourceConfig {
     pub bindgroups: HashMap<String, BindGroupConfig>,
 }
 
+#[allow(unused)]
 #[derive(Debug, Deserialize)]
 pub struct PipelineConfig {
     pub shader: String,
@@ -84,6 +85,7 @@ pub struct PipelineConfig {
     pub bind_group_layouts: Vec<String>,
 }
 
+#[allow(unused)]
 #[derive(Debug, Deserialize)]
 pub struct GraphConfig {
     pub version: String,

@@ -10,13 +10,14 @@ pub mod shader;
 pub mod texture;
 pub mod vertex;
 
+pub mod buffer;
+
 use std::{
     collections::HashMap,
     ops::Range,
     sync::{Arc, LazyLock, Mutex},
 };
 
-use tokio::runtime::Runtime;
 use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 
 use winit::{dpi::PhysicalSize, window::Window};
@@ -38,11 +39,12 @@ use crate::{
 };
 
 pub enum UserDataType {
-    Model(Arc<Model>, Arc<wgpu::Buffer>),
-    ModelInstance(Arc<Model>, Range<u32>, Arc<wgpu::Buffer>),
+    Model(Arc<tokio::sync::Mutex<Model>>, Arc<wgpu::Buffer>),
+    ModelInstance(Arc<tokio::sync::Mutex<Model>>, Range<u32>, Arc<wgpu::Buffer>),
     // ModelInstanceBindGroup(Arc<Model>, Range<u32>, Arc<wgpu::Buffer>, Arc<wgpu::BindGroup>),
 }
 
+#[allow(unused)]
 pub struct WgpuAppGraphResource {
     pub graph_config: GraphConfig,
     pub shader: ShaderInfo,
@@ -68,6 +70,15 @@ static APP_MODULES: LazyLock<
 pub fn registe_module(name: &str, module: Box<dyn WgpuAppModule + 'static + Sync + Send>) {
     APP_MODULES.lock().unwrap().insert(name.to_string(), module);
 }
+
+macro_rules! RegisterModel {
+    ($app: expr, $name: expr, $datas: expr) => {
+        let mut entry_lock = $app.user_data.lock().unwrap();
+        let entry = entry_lock.entry($name.to_string()).or_default();
+        *entry = $datas;
+    };
+}
+pub(crate) use RegisterModel;
 
 impl WgpuApp {
     fn resize_surface_if_needed(&mut self) {
@@ -108,7 +119,7 @@ impl WgpuAppAction for WgpuApp {
         // y: screen top
         // z: out of screen (to user)
         let camera_config = CameraConfig {
-            eye: (f32::EPSILON, 0.0, 100.0).into(),
+            eye: (f32::EPSILON, 75.0, 100.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3 {
                 x: 0.0,
@@ -274,10 +285,12 @@ impl WgpuAppAction for WgpuApp {
                 for data in datas {
                     match data {
                         UserDataType::Model(model, instance_buffer) => {
+                            let model = &*model.blocking_lock();
                             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
                             render_pass.draw_model(&self.app_surface.queue, model, self.camera.bind_group.as_ref().unwrap());
                         }
                         UserDataType::ModelInstance(model, instances, instance_buffer) => {
+                            let model = &*model.blocking_lock();
                             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
                             render_pass.draw_model_instanced(
                                 &self.app_surface.queue,

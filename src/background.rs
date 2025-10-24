@@ -1,44 +1,49 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use cgmath::{Matrix4, Rotation3};
+use cgmath::Rotation3;
 use tokio::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 use crate::engine::{
-    instance::Instance, model::{Mesh, Model, ModelVertex, ObjMaterial}, module::WgpuAppModule, resource::load_texture, UserDataType, WgpuApp
+    RegisterModel, UserDataType, WgpuApp,
+    instance::{Instance, to_instance_buffer},
+    model::{Mesh, Model, ModelVertex, ObjMaterial},
+    module::WgpuAppModule,
+    resource::load_texture,
 };
 
 const BACKGOUND_IMGAE_PATH: &str = "grassland.jpg";
 const BG_SIZE: f32 = 100.0;
-const BG_LAYZER: f32 = -5.0;
+const BG_LAYZER: f32 = 2.0;
+const BG_X_SCALE: f32 = 10.0;
 const VERTICES: &[ModelVertex] = &[
     ModelVertex {
-        position: [BG_SIZE, BG_SIZE, BG_LAYZER],
-        tex_coord: [2.0, -2.0],
+        position: [BG_SIZE * BG_X_SCALE, BG_LAYZER, BG_SIZE],
+        tex_coord: [2.0 * BG_X_SCALE, -2.0],
         normal: [0.0, 0.0, 0.0],
     },
     ModelVertex {
-        position: [-BG_SIZE, BG_SIZE, BG_LAYZER],
-        tex_coord: [-2.0, -2.0],
+        position: [-BG_SIZE * BG_X_SCALE, BG_LAYZER, BG_SIZE],
+        tex_coord: [-2.0 * BG_X_SCALE, -2.0],
         normal: [0.0, 0.0, 0.0],
     },
     ModelVertex {
-        position: [BG_SIZE, -BG_SIZE, BG_LAYZER],
-        tex_coord: [2.0, 2.0],
+        position: [BG_SIZE * BG_X_SCALE, BG_LAYZER, -BG_SIZE],
+        tex_coord: [2.0 * BG_X_SCALE, 2.0],
         normal: [0.0, 0.0, 0.0],
     },
     ModelVertex {
-        position: [-BG_SIZE, -BG_SIZE, BG_LAYZER],
-        tex_coord: [-2.0, 2.0],
+        position: [-BG_SIZE * BG_X_SCALE, BG_LAYZER, -BG_SIZE],
+        tex_coord: [-2.0 * BG_X_SCALE, 2.0],
         normal: [0.0, 0.0, 0.0],
     },
 ];
 
-const INDICES: &[u32] = &[0, 1, 2, 2, 1, 3];
+// const INDICES: &[u32] = &[0, 1, 2, 2, 1, 3, 3, 1, 2, 2, 1, 0];
+const INDICES: &[u32] = &[3, 1, 2, 2, 1, 0];
 
 async fn load_background(app: Arc<Mutex<WgpuApp>>) {
-    println!("[Debug] {:?}({:?})", file!(), line!());
     let app = app.lock().await;
     let vertices_data = unsafe { VERTICES.align_to::<u8>().1 };
     let vertex_buffer =
@@ -68,8 +73,11 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
     )
     .await
     .unwrap();
-    let background_texture_bind_group_layout =
-        app.graph_resource.bind_group_info.get("bg_texture").unwrap();
+    let background_texture_bind_group_layout = app
+        .graph_resource
+        .bind_group_info
+        .get("bg_texture")
+        .unwrap();
     let background_texture_bind_group =
         app.app_surface
             .device
@@ -98,12 +106,9 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
             num_elements: INDICES.len() as u32,
             material: 0,
             animation: None,
-            uniform_transform: std::sync::Mutex::new(None),
-            uniform_transform_buffer: None,
-            uniform_transform_layout: None,
-            uniform_transform_bindgroup: None,
+            uniform_transform: None,
         }],
-        materials: vec![Arc::new(std::sync::Mutex::new( ObjMaterial {
+        materials: vec![Arc::new(std::sync::Mutex::new(ObjMaterial {
             name: "Backgound".to_string(),
             diffuse_texture: Some(background_texture),
             bind_group: Some(background_texture_bind_group),
@@ -114,37 +119,44 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
     let instances = {
         let position = cgmath::vec3(0.0, 0.0, 0.0);
         let rotation =
-            cgmath::Quaternion::from_axis_angle(cgmath::vec3(0.0, 0.0, 1.0), cgmath::Deg(90.0));
+            cgmath::Quaternion::from_axis_angle(cgmath::vec3(0.0, 0.0, 0.0), cgmath::Deg(0.0));
         let scale = 1.0;
-        Instance { position, rotation, scale }
+        Instance {
+            position,
+            rotation,
+            scale,
+        }
     };
 
-    const SIZE_MAT4: usize = core::mem::size_of::<Matrix4<f32>>();
-    let instance_data = vec![&instances]
-        .iter()
-        .flat_map(|val| {
-            let model = val.as_model();
-            unsafe { core::mem::transmute::<Matrix4<f32>, [u8; SIZE_MAT4]>(model) }
-        })
-        .collect::<Vec<u8>>();
+    // const SIZE_MAT4: usize = core::mem::size_of::<Matrix4<f32>>();
+    // let instance_data = vec![&instances]
+    //     .iter()
+    //     .flat_map(|val| {
+    //         let model = val.as_model();
+    //         unsafe { core::mem::transmute::<Matrix4<f32>, [u8; SIZE_MAT4]>(model) }
+    //     })
+    //     .collect::<Vec<u8>>();
 
-    let instance_buffer =
-        app.app_surface
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Instances buffer"),
-                contents: instance_data.as_slice(),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+    // let instance_buffer =
+    //     app.app_surface
+    //         .device
+    //         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //             label: Some("Instances buffer"),
+    //             contents: instance_data.as_slice(),
+    //             usage: wgpu::BufferUsages::VERTEX,
+    //         });
+
+    let instance_buffer = to_instance_buffer(&app.app_surface.device, &[instances]);
 
     let mut datas = Vec::new();
     datas.push(UserDataType::Model(
-        Arc::new(model),
+        Arc::new(tokio::sync::Mutex::new(model)),
         Arc::new(instance_buffer),
     ));
-    let mut entry_lock = app.user_data.lock().unwrap();
-    let entry = entry_lock.entry("background".to_string()).or_default();
-    *entry = datas;
+    // let mut entry_lock = app.user_data.lock().unwrap();
+    // let entry = entry_lock.entry("background".to_string()).or_default();
+    // *entry = datas;
+    RegisterModel!(app, "background", datas);
 }
 
 pub struct BackgroundModule {}
@@ -156,7 +168,7 @@ impl WgpuAppModule for BackgroundModule {
     }
 
     async fn probe(&mut self, app: Arc<Mutex<WgpuApp>>) -> anyhow::Result<()> {
-        // load_background(app.clone()).await;
+        load_background(app.clone()).await;
         Ok(())
     }
 }

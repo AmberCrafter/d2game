@@ -5,7 +5,8 @@ use crate::engine::{
     vertex::VertexBufferInfo,
 };
 
-struct RenderPipelineInfoInner {
+#[allow(unused)]
+pub struct RenderPipelineInfoInner {
     layout: wgpu::PipelineLayout,
     pipeline: wgpu::RenderPipeline,
 }

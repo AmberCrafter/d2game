@@ -1,6 +1,14 @@
-use std::{io::Cursor, path::PathBuf, sync::{Arc, Mutex}};
+use std::{
+    io::Cursor,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
-use crate::engine::{model::{self, Animation}, texture};
+use crate::engine::{
+    buffer::setup_uniform,
+    model::{self, Animation},
+    texture,
+};
 use cgmath::SquareMatrix;
 use wgpu::util::DeviceExt;
 
@@ -368,60 +376,13 @@ pub async fn load_obj_model(
             num_elements: model.mesh.indices.len() as u32,
             material: model.mesh.material_id.unwrap_or(0),
             animation: None,
-            uniform_transform: std::sync::Mutex::new(None),
-            uniform_transform_buffer: None,
-            uniform_transform_layout: None,
-            uniform_transform_bindgroup: None,
+            uniform_transform: None,
         };
 
         meshes.push(mesh);
     }
 
     Ok(model::Model { meshes, materials })
-}
-
-
-fn setup_transform_uniform(device: &wgpu::Device, name: &str) -> (
-    wgpu::Buffer,
-    wgpu::BindGroupLayout,
-    wgpu::BindGroup,
-) {
-    let data = cgmath::Matrix4::identity();
-
-    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some(&format!("{} transform uniform buffer", name)),
-        contents: &unsafe { core::mem::transmute::<cgmath::Matrix4<f32>, [u8; 64]>(data) },
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    });
-
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some(&format!("{} transform uniform bind group layout", name)),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            visibility: wgpu::ShaderStages::VERTEX,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        }],
-    });
-
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some(&format!("{} transform uniform bind group", name)),
-        layout: &bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: buffer.as_entire_binding(),
-        }],
-    });
-
-    (
-        buffer,
-        bind_group_layout,
-        bind_group
-    )
 }
 
 pub async fn load_gltf_model(
@@ -446,15 +407,14 @@ pub async fn load_gltf_model(
         */
 
         // 0
-        let base_color = if let base_color = pbr.base_color_factor() {
+        let base_color = {
+            let base_color = pbr.base_color_factor();
             let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("[{file_name}] base_color")),
                 contents: unsafe { base_color.align_to::<u8>().1 },
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
             Some(buffer)
-        } else {
-            None
         };
         if let Some(buffer) = base_color.as_ref() {
             entries.push(wgpu::BindGroupEntry {
@@ -464,15 +424,14 @@ pub async fn load_gltf_model(
         };
 
         // 1
-        let metallic = if let metallic = pbr.metallic_factor() {
+        let metallic =  {
+            let metallic = pbr.metallic_factor();
             let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("[{file_name}] metallic")),
                 contents: &metallic.to_ne_bytes(),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
             Some(buffer)
-        } else {
-            None
         };
         if let Some(buffer) = metallic.as_ref() {
             entries.push(wgpu::BindGroupEntry {
@@ -482,15 +441,14 @@ pub async fn load_gltf_model(
         };
 
         // 2
-        let roughness = if let roughness = pbr.roughness_factor() {
+        let roughness =  {
+            let roughness = pbr.roughness_factor();
             let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("[{file_name}] roughness")),
                 contents: &roughness.to_ne_bytes(),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
             Some(buffer)
-        } else {
-            None
         };
         if let Some(buffer) = roughness.as_ref() {
             entries.push(wgpu::BindGroupEntry {
@@ -596,15 +554,14 @@ pub async fn load_gltf_model(
         }
 
         // 11
-        let emissive_factor = if let emissive_factor = mtl.emissive_factor() {
+        let emissive_factor =  {
+            let emissive_factor = mtl.emissive_factor();
             let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("[{file_name}] emissive_factor")),
                 contents: unsafe { emissive_factor.align_to::<u8>().1 },
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
             Some(buffer)
-        } else {
-            None
         };
         if let Some(buffer) = emissive_factor.as_ref() {
             entries.push(wgpu::BindGroupEntry {
@@ -690,7 +647,7 @@ pub async fn load_gltf_model(
                     let position = cgmath::Vector4::new(position[0], position[1], position[2], 1.0);
                     let position = transform * position;
                     let position = position.truncate().into();
-                    
+
                     vertices.push(model::ModelVertex {
                         position,
                         tex_coord,
@@ -726,9 +683,11 @@ pub async fn load_gltf_model(
             };
             for doc_animation in document.animations() {
                 for channel in doc_animation.channels() {
-                    if channel.target().node().index() != node.index() { continue; }
+                    if channel.target().node().index() != node.index() {
+                        continue;
+                    }
 
-                    let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]) );
+                    let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
                     let mut times = Vec::new();
                     for input in reader.read_inputs().unwrap() {
                         times.push(input);
@@ -738,23 +697,31 @@ pub async fn load_gltf_model(
 
                     if let Some(output) = reader.read_outputs() {
                         match output {
-                            gltf::animation::util::ReadOutputs::MorphTargetWeights(val) => {unimplemented!()},
+                            gltf::animation::util::ReadOutputs::MorphTargetWeights(_val) => {
+                                unimplemented!()
+                            }
                             gltf::animation::util::ReadOutputs::Translations(val) => {
-                                let buf = times.iter().zip(val).map(|(&t, v)| {
-                                    (t, v)
-                                }).collect::<Vec<_>>();
+                                let buf = times
+                                    .iter()
+                                    .zip(val)
+                                    .map(|(&t, v)| (t, v))
+                                    .collect::<Vec<_>>();
                                 animation.set_translations(buf).unwrap();
-                            },
+                            }
                             gltf::animation::util::ReadOutputs::Rotations(val) => {
-                                let buf = times.iter().zip(val.into_f32()).map(|(&t, v)| {
-                                    (t, v)
-                                }).collect::<Vec<_>>();
+                                let buf = times
+                                    .iter()
+                                    .zip(val.into_f32())
+                                    .map(|(&t, v)| (t, v))
+                                    .collect::<Vec<_>>();
                                 animation.set_rotations(buf).unwrap();
-                            },
+                            }
                             gltf::animation::util::ReadOutputs::Scales(val) => {
-                                let buf = times.iter().zip(val).map(|(&t, v)| {
-                                    (t, v)
-                                }).collect::<Vec<_>>();
+                                let buf = times
+                                    .iter()
+                                    .zip(val)
+                                    .map(|(&t, v)| (t, v))
+                                    .collect::<Vec<_>>();
                                 animation.set_scales(buf).unwrap();
                             }
                         }
@@ -762,8 +729,14 @@ pub async fn load_gltf_model(
                 }
             }
 
-            let (buffer, layout, bindgroup) = setup_transform_uniform(device, &name);
-
+            const TYPESIZE: usize = core::mem::size_of::<cgmath::Matrix4<f32>>();
+            let uniform_transform = setup_uniform::<cgmath::Matrix4<f32>, TYPESIZE>(
+                device,
+                &name,
+                cgmath::Matrix4::identity(),
+                0,
+                wgpu::ShaderStages::VERTEX,
+            );
 
             let mesh = model::Mesh {
                 name: name,
@@ -773,11 +746,7 @@ pub async fn load_gltf_model(
                 num_elements: indices.len() as u32,
                 material: material_idx,
                 animation: Some(animation),
-                uniform_transform: std::sync::Mutex::new(Some(cgmath::Matrix4::identity())),
-
-                uniform_transform_buffer: Some(buffer),
-                uniform_transform_layout: Some(layout),
-                uniform_transform_bindgroup: Some(bindgroup),
+                uniform_transform: Some(uniform_transform),
             };
 
             meshes.push(mesh);
@@ -785,24 +754,4 @@ pub async fn load_gltf_model(
     }
 
     Ok(model::Model { meshes, materials })
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    fn dev_case() {
-        // let filename = "player_walk.gltf";
-        // let filename = "player_walk_texture/player_walk_texture.gltf";
-
-        // let Ok(rt) = tokio::runtime::Runtime::new() else {
-        //     panic!("System Error");
-        // };
-
-        // let model = rt
-        //     .block_on(load_model(filename))
-        //     .expect("load model failed");
-
-        // println!("{:?}", model);
-    }
 }

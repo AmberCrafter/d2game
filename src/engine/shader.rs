@@ -2,12 +2,14 @@ use std::{collections::HashMap, io::Read};
 
 use crate::engine::config::GraphConfig;
 
+#[allow(unused)]
 pub struct ShaderInfo {
     pub vertex: Option<wgpu::ShaderModule>,
     pub fragment: Option<wgpu::ShaderModule>,
     pub map: HashMap<String, wgpu::ShaderModule>,
 }
 
+#[allow(unused)]
 impl ShaderInfo {
     pub fn new() -> Self {
         Self {

@@ -66,9 +66,6 @@ impl VertexBufferInfo {
             let mode = match vb.1.mode {
                 VertexStepMode::VERTEX => wgpu::VertexStepMode::Vertex,
                 VertexStepMode::INSTANCE => wgpu::VertexStepMode::Instance,
-                _ => {
-                    unimplemented!()
-                }
             };
 
             self.map.insert(

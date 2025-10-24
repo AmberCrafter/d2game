@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 
 use crate::engine::{UserDataType, WgpuApp, instance::Instance, module::WgpuAppModule, resource};
 
+#[allow(unused)]
 async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
     println!("[Debug] {:?}({:?})", file!(), line!());
     let app = app.lock().await;
@@ -65,7 +66,7 @@ async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
 
     let mut datas = Vec::new();
     datas.push(UserDataType::ModelInstance(
-        Arc::new(obj_model),
+        Arc::new(tokio::sync::Mutex::new(obj_model)),
         0..instances.len() as u32,
         Arc::new(instance_buffer),
     ));
@@ -74,6 +75,7 @@ async fn load_resource(app: Arc<tokio::sync::Mutex<WgpuApp>>) {
     *entry = datas;
 }
 
+#[allow(unused)]
 pub struct ItemModule {}
 
 #[async_trait]
@@ -87,7 +89,7 @@ impl WgpuAppModule for ItemModule {
         Ok(())
     }
 
-    fn update(&mut self, queue: &wgpu::Queue, dt: std::time::Duration) -> anyhow::Result<()> {
+    fn update(&mut self, _queue: &wgpu::Queue, _dt: std::time::Duration) -> anyhow::Result<()> {
         Ok(())
     }
 }

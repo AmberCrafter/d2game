@@ -63,10 +63,10 @@ var<uniform> emissive: f32;
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     var norm: vec3f = normalize(in.norm);
     var viewDir: vec3f = normalize(in.view_pos - in.clip_position.xyz);  // FragPos -> viewPos
-    var lightDir: vec3f = normalize(in.view_pos - in.clip_position.xyz);  // FragPos -> lightPos
-    var reflectDir: vec3f = reflect(-lightDir, norm);
+    var lightDir: vec3f = normalize(in.view_pos);  // FragPos -> lightPos
+    var reflectDir: vec3f = reflect(lightDir, norm);
 
-    var lightWeight: f32 = max(dot(norm, lightDir), emissive);
+    var lightWeight: f32 = max(dot(norm, lightDir), max(emissive, 0.1));
     var specWeight: f32 = 1.5 * pow(max(dot(viewDir, reflectDir), 0.0), roughness);
 
 

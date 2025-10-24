@@ -1,4 +1,4 @@
-use cgmath::{Deg, EuclideanSpace, InnerSpace, Matrix, SquareMatrix};
+use cgmath::{Deg, InnerSpace, SquareMatrix};
 use wgpu::{Device, util::DeviceExt};
 use winit::event::KeyEvent;
 
@@ -128,15 +128,19 @@ impl CameraController {
 
         let right = forward_norm.cross(config.up);
 
-        let forward = config.target - config.eye;
-        let forward_mag = forward.magnitude();
+        // let forward = config.target - config.eye;
+        // let forward_mag = forward.magnitude();
 
         if self.is_left_press {
-            config.eye = config.target - (forward - right * self.speed).normalize() * forward_mag;
+            // config.eye = config.target - (forward - right * self.speed).normalize() * forward_mag;
+            config.eye = config.eye - right * self.speed;
+            config.target -= right * self.speed;
         }
 
         if self.is_right_press {
-            config.eye = config.target - (forward + right * self.speed).normalize() * forward_mag;
+            // config.eye = config.target - (forward + right * self.speed).normalize() * forward_mag;
+            config.eye = config.eye + right * self.speed;
+            config.target += right * self.speed;
         }
     }
 }

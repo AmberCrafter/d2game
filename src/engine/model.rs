@@ -6,8 +6,6 @@ use std::{
 
 use cgmath::SquareMatrix;
 
-use crate::engine::vertex;
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct ModelVertex {
@@ -216,17 +214,14 @@ pub struct Mesh {
     pub num_elements: u32,
     pub material: usize,
     pub animation: Option<Animation>,
-    pub uniform_transform: Mutex<Option<cgmath::Matrix4<f32>>>,
-    pub uniform_transform_buffer: Option<wgpu::Buffer>,
-    pub uniform_transform_layout: Option<wgpu::BindGroupLayout>,
-    pub uniform_transform_bindgroup: Option<wgpu::BindGroup>,
+    pub uniform_transform: Option<crate::engine::buffer::Buffer<cgmath::Matrix4<f32>>>,
 }
 
 impl Mesh {
-    pub fn update_transform(&self, transform: cgmath::Matrix4<f32>) {
-        let mut uniform_lock = self.uniform_transform.lock();
-        let inner = uniform_lock.as_mut().unwrap();
-        inner.replace(transform);
+    pub fn update_transform(&mut self, transform: cgmath::Matrix4<f32>) {
+        if let Some(buffer) = self.uniform_transform.as_mut() {
+            let _ = buffer.set_data(transform);
+        }
     }
 }
 
@@ -291,20 +286,26 @@ impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
         self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
         self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
-        let uniform_lock = mesh.uniform_transform.lock().unwrap();
-        match (
-            mesh.uniform_transform_buffer.as_ref(),
-            mesh.uniform_transform_bindgroup.as_ref(),
-            *uniform_lock,
-        ) {
-            (Some(buffer), Some(bindgroup), Some(data)) => {
-                let data =
-                    unsafe { core::mem::transmute::<cgmath::Matrix4<f32>, [u8; 64]>(data.clone()) };
-                queue.write_buffer(&buffer, 0, &data);
-                self.set_bind_group(2, bindgroup, &[]);
-            }
-            _ => {}
+        // let uniform_lock = mesh.uniform_transform.lock().unwrap();
+        // match (
+        //     mesh.uniform_transform_buffer.as_ref(),
+        //     mesh.uniform_transform_bindgroup.as_ref(),
+        //     *uniform_lock,
+        // ) {
+        //     (Some(buffer), Some(bindgroup), Some(data)) => {
+        //         let data =
+        //             unsafe { core::mem::transmute::<cgmath::Matrix4<f32>, [u8; 64]>(data.clone()) };
+        //         queue.write_buffer(&buffer, 0, &data);
+        //         self.set_bind_group(2, bindgroup, &[]);
+        //     }
+        //     _ => {}
+        // }
+
+        if let Some(transform) = &mesh.uniform_transform {
+            queue.write_buffer(transform.get_buffer().unwrap(), 0, transform.as_bytes());
+            self.set_bind_group(2, transform.get_bind_group().unwrap(), &[]);
         }
+
         self.set_bind_group(0, material.lock().unwrap().get_bind_group(), &[]);
         self.set_bind_group(1, camera_bind_group, &[]);
         self.draw_indexed(0..mesh.num_elements, 0, instances);

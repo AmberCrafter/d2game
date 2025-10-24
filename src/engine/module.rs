@@ -4,6 +4,7 @@ use tokio::sync::Mutex;
 
 use crate::engine::WgpuApp;
 
+#[allow(unused)]
 #[async_trait]
 pub trait WgpuAppModule {
     fn new() -> Self
