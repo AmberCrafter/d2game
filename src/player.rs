@@ -4,28 +4,19 @@ use async_trait::async_trait;
 use cgmath::Rotation3;
 
 use crate::engine::{
-    instance::{to_instance_buffer, Instance}, model::Model, module::WgpuAppModule, resource, RegisterModel, UserDataType, WgpuApp
+    WgpuApp, instance::Instance, model::Model, module::WgpuAppModule, register_model_instances,
+    resource,
 };
 
 async fn load_resource(
     app: Arc<tokio::sync::Mutex<WgpuApp>>,
 ) -> (Arc<tokio::sync::Mutex<Model>>, Arc<wgpu::Buffer>) {
     let app = app.lock().await;
-    // let texture_bind_group_layout = app.texture.bind_group_layout.as_ref().unwrap();
     let texture_bind_group_layout = app
         .graph_resource
         .bind_group_info
         .get("player_gltf_texture")
         .unwrap();
-
-    // let obj_model = resource::load_obj_model(
-    //     &app.app_surface.device,
-    //     &app.app_surface.queue,
-    //     texture_bind_group_layout,
-    //     "player.obj",
-    // )
-    // .await
-    // .unwrap();
 
     let obj_model = resource::load_gltf_model(
         &app.app_surface.device,
@@ -50,23 +41,7 @@ async fn load_resource(
         }
     }];
 
-    let instance_buffer = to_instance_buffer(&app.app_surface.device, &instances);
-
-    let mut datas = Vec::new();
-    let obj_model = Arc::new(tokio::sync::Mutex::new(obj_model));
-    let instance_buffer = Arc::new(instance_buffer);
-    datas.push(UserDataType::ModelInstance(
-        obj_model.clone(),
-        0..instances.len() as u32,
-        instance_buffer.clone(),
-    ));
-    // let mut entry_lock = app.user_data.lock().unwrap();
-    // let entry = entry_lock.entry("player".to_string()).or_default();
-    // *entry = datas;
-
-    RegisterModel!(app, "player", datas);
-
-    (obj_model, instance_buffer)
+    register_model_instances("player", &*app, obj_model, &instances)
 }
 
 pub struct PlayerModule {

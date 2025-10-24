@@ -22,25 +22,27 @@ use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 
 use winit::{dpi::PhysicalSize, window::Window};
 
-use crate::{
-    background::{self},
-    engine::{
-        bindgroup::BindGroupInfo,
-        camera::{CameraConfig, CameraInfo},
-        config::GraphConfig,
-        model::{DrawModel, Model},
-        module::WgpuAppModule,
-        render_pipeline::RenderPipelineInfo,
-        shader::ShaderInfo,
-        texture::{Texture, TextureInfo},
-        vertex::VertexBufferInfo,
-    },
-    player,
+use crate::engine::{
+    bindgroup::BindGroupInfo,
+    camera::{CameraConfig, CameraInfo},
+    config::GraphConfig,
+    instance::{Instance, to_instance_buffer},
+    model::{DrawModel, Model},
+    module::WgpuAppModule,
+    render_pipeline::RenderPipelineInfo,
+    shader::ShaderInfo,
+    texture::{Texture, TextureInfo},
+    vertex::VertexBufferInfo,
 };
 
+#[allow(unused)]
 pub enum UserDataType {
     Model(Arc<tokio::sync::Mutex<Model>>, Arc<wgpu::Buffer>),
-    ModelInstance(Arc<tokio::sync::Mutex<Model>>, Range<u32>, Arc<wgpu::Buffer>),
+    ModelInstance(
+        Arc<tokio::sync::Mutex<Model>>,
+        Range<u32>,
+        Arc<wgpu::Buffer>,
+    ),
     // ModelInstanceBindGroup(Arc<Model>, Range<u32>, Arc<wgpu::Buffer>, Arc<wgpu::BindGroup>),
 }
 
@@ -63,22 +65,37 @@ pub struct WgpuApp {
     pub user_data: Arc<Mutex<HashMap<String, Vec<UserDataType>>>>,
 }
 
-static APP_MODULES: LazyLock<
+static APP_MODELS: LazyLock<
     Mutex<HashMap<String, Box<dyn WgpuAppModule + 'static + Sync + Send>>>,
 > = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub fn registe_module(name: &str, module: Box<dyn WgpuAppModule + 'static + Sync + Send>) {
-    APP_MODULES.lock().unwrap().insert(name.to_string(), module);
+pub fn registe_app_model(name: &str, module: Box<dyn WgpuAppModule + 'static + Sync + Send>) {
+    APP_MODELS.lock().unwrap().insert(name.to_string(), module);
 }
 
-macro_rules! RegisterModel {
-    ($app: expr, $name: expr, $datas: expr) => {
-        let mut entry_lock = $app.user_data.lock().unwrap();
-        let entry = entry_lock.entry($name.to_string()).or_default();
-        *entry = $datas;
-    };
+pub fn register_model_instances(
+    name: &str,
+    app: &WgpuApp,
+    model: Model,
+    instances: &[Instance],
+) -> (Arc<tokio::sync::Mutex<Model>>, Arc<wgpu::Buffer>) {
+    let instance_buffer = to_instance_buffer(&app.app_surface.device, instances);
+
+    let mut datas = Vec::new();
+    let model = Arc::new(tokio::sync::Mutex::new(model));
+    let instance_buffer = Arc::new(instance_buffer);
+    datas.push(UserDataType::ModelInstance(
+        model.clone(),
+        0..instances.len() as u32,
+        instance_buffer.clone(),
+    ));
+
+    let mut entry_lock = app.user_data.lock().unwrap();
+    let entry = entry_lock.entry(name.to_string()).or_default();
+    *entry = datas;
+
+    (model, instance_buffer)
 }
-pub(crate) use RegisterModel;
 
 impl WgpuApp {
     fn resize_surface_if_needed(&mut self) {
@@ -164,10 +181,6 @@ impl WgpuAppAction for WgpuApp {
 
         let user_data = Arc::new(Mutex::new(HashMap::new()));
 
-        // registe_module("item", Box::new(item::ItemModule::new()));
-        registe_module("player", Box::new(player::PlayerModule::new()));
-        registe_module("background", Box::new(background::BackgroundModule::new()));
-
         let app = Self {
             app_surface,
             size,
@@ -178,7 +191,7 @@ impl WgpuAppAction for WgpuApp {
         };
 
         let arc_app = Arc::new(tokio::sync::Mutex::new(app));
-        let mut module_lock = APP_MODULES.lock().unwrap();
+        let mut module_lock = APP_MODELS.lock().unwrap();
         for ele in module_lock.iter_mut() {
             let _ = ele.1.probe(arc_app.clone()).await;
         }
@@ -208,7 +221,7 @@ impl WgpuAppAction for WgpuApp {
     }
 
     fn update(&mut self, dt: std::time::Duration) {
-        let mut module_lock = APP_MODULES.lock().unwrap();
+        let mut module_lock = APP_MODELS.lock().unwrap();
         for ele in module_lock.iter_mut() {
             let _ = ele.1.update(&self.app_surface.queue, dt);
         }
@@ -287,7 +300,11 @@ impl WgpuAppAction for WgpuApp {
                         UserDataType::Model(model, instance_buffer) => {
                             let model = &*model.blocking_lock();
                             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                            render_pass.draw_model(&self.app_surface.queue, model, self.camera.bind_group.as_ref().unwrap());
+                            render_pass.draw_model(
+                                &self.app_surface.queue,
+                                model,
+                                self.camera.bind_group.as_ref().unwrap(),
+                            );
                         }
                         UserDataType::ModelInstance(model, instances, instance_buffer) => {
                             let model = &*model.blocking_lock();

@@ -6,10 +6,11 @@ use tokio::sync::Mutex;
 use wgpu::util::DeviceExt;
 
 use crate::engine::{
-    RegisterModel, UserDataType, WgpuApp,
-    instance::{Instance, to_instance_buffer},
+    WgpuApp,
+    instance::Instance,
     model::{Mesh, Model, ModelVertex, ObjMaterial},
     module::WgpuAppModule,
+    register_model_instances,
     resource::load_texture,
 };
 
@@ -128,35 +129,7 @@ async fn load_background(app: Arc<Mutex<WgpuApp>>) {
         }
     };
 
-    // const SIZE_MAT4: usize = core::mem::size_of::<Matrix4<f32>>();
-    // let instance_data = vec![&instances]
-    //     .iter()
-    //     .flat_map(|val| {
-    //         let model = val.as_model();
-    //         unsafe { core::mem::transmute::<Matrix4<f32>, [u8; SIZE_MAT4]>(model) }
-    //     })
-    //     .collect::<Vec<u8>>();
-
-    // let instance_buffer =
-    //     app.app_surface
-    //         .device
-    //         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-    //             label: Some("Instances buffer"),
-    //             contents: instance_data.as_slice(),
-    //             usage: wgpu::BufferUsages::VERTEX,
-    //         });
-
-    let instance_buffer = to_instance_buffer(&app.app_surface.device, &[instances]);
-
-    let mut datas = Vec::new();
-    datas.push(UserDataType::Model(
-        Arc::new(tokio::sync::Mutex::new(model)),
-        Arc::new(instance_buffer),
-    ));
-    // let mut entry_lock = app.user_data.lock().unwrap();
-    // let entry = entry_lock.entry("background".to_string()).or_default();
-    // *entry = datas;
-    RegisterModel!(app, "background", datas);
+    register_model_instances("background", &*app, model, &[instances]);
 }
 
 pub struct BackgroundModule {}
