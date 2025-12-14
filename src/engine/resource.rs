@@ -1,13 +1,14 @@
 #[cfg(not(target_arch = "wasm32"))]
-use std::{
-    io::{BufReader, Cursor},
-};
+use std::io::{BufReader, Cursor};
 
 use std::{collections::HashMap, path::Path, sync::Arc};
 
 use crate::engine::{
-        BoxResult, buffer::setup_uniform, model::{self, Animation, ModelVertex}, texture
-    };
+    BoxResult,
+    buffer::setup_uniform,
+    model::{self, Animation, ModelVertex},
+    texture,
+};
 use anyhow::anyhow;
 use cgmath::SquareMatrix;
 use wgpu::util::DeviceExt;
@@ -104,7 +105,8 @@ pub async fn load_obj_model(
             ..Default::default()
         },
         material_loader,
-    ).await?;
+    )
+    .await?;
 
     let mut materials = Vec::new();
     for mtl in obj_materials? {
@@ -350,22 +352,24 @@ pub async fn load_obj_model(
             entries: &entries,
         });
 
-        materials.push(Arc::new((model::ObjMaterial {
-            name: mtl.name,
-            ambient,
-            diffuse,
-            specular,
-            shininess,
-            optical_density,
-            ambient_texture,
-            diffuse_texture,
-            specular_texture,
-            normal_texture,
-            shininess_texture,
-            dissolve_texture,
-            illumination_model,
-            bind_group: Some(bind_group),
-        })) as Arc<_>);
+        materials.push(Arc::new(
+            (model::ObjMaterial {
+                name: mtl.name,
+                ambient,
+                diffuse,
+                specular,
+                shininess,
+                optical_density,
+                ambient_texture,
+                diffuse_texture,
+                specular_texture,
+                normal_texture,
+                shininess_texture,
+                dissolve_texture,
+                illumination_model,
+                bind_group: Some(bind_group),
+            }),
+        ) as Arc<_>);
     }
 
     let mut meshes = Vec::new();
@@ -418,7 +422,12 @@ pub async fn load_obj_model(
         meshes.push(mesh);
     }
 
-    Ok(model::Model { name: "obj".to_string(), meshes, materials, animations: HashMap::new() })
+    Ok(model::Model {
+        name: "obj".to_string(),
+        meshes,
+        materials,
+        animations: HashMap::new(),
+    })
 }
 
 pub fn load_gltf_model(
@@ -746,13 +755,20 @@ pub fn load_gltf_model(
                 .name()
                 .unwrap_or(&format!("{}_animation", filename))
                 .to_string();
-            let mut period = 0.0_f32;
 
             let mut map: HashMap<usize, Animation> = HashMap::new();
 
             for channel in doc_animation.channels() {
                 let mesh_id = channel.target().node().index();
-                let entry = map.entry(mesh_id).or_default();
+                let entry = map.entry(mesh_id).or_insert(Animation {
+                    name: name.clone(),
+                    mesh_id,
+                    translation: None,
+                    rotation: None,
+                    scale: None,
+                    period: 0.0_f32,
+                    do_loop: true,
+                });
 
                 let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
                 let mut times = Vec::new();
@@ -760,7 +776,8 @@ pub fn load_gltf_model(
                     times.push(input);
                 }
 
-                period = period.max(*times.last().unwrap());
+                entry.mesh_id = mesh_id;
+                entry.period = entry.period.max(*times.last().unwrap());
 
                 if let Some(output) = reader.read_outputs() {
                     match output {

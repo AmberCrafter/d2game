@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{process::exit, sync::Arc};
 
 use cgmath::Rotation3;
 

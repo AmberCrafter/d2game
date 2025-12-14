@@ -39,9 +39,9 @@ type BoxResult<T> = anyhow::Result<T>;
 
 #[allow(unused)]
 pub enum UserDataType {
-    Model(Arc<tokio::sync::Mutex<Model>>, Arc<wgpu::Buffer>),
+    Model(Arc<std::sync::Mutex<Model>>, Arc<wgpu::Buffer>),
     ModelInstance(
-        Arc<tokio::sync::Mutex<Model>>,
+        Arc<std::sync::Mutex<Model>>,
         Range<u32>,
         Arc<wgpu::Buffer>,
     ),
@@ -65,8 +65,9 @@ pub struct WgpuApp {
     pub controller: Controller,
     pub camera: CameraInfo,
     pub graph_resource: WgpuAppGraphResource,
-    models: Vec<(Arc<tokio::sync::Mutex<Model>>, Vec<Instance>)>,
-    pub user_data: Arc<Mutex<HashMap<String, Vec<UserDataType>>>>,
+    models: Vec<(Arc<std::sync::Mutex<Model>>, Vec<Instance>)>,
+    pub user_data: Arc<Mutex<HashMap<String, UserDataType>>>,
+    timer: std::time::Duration,
 }
 
 // static APP_MODELS: LazyLock<
@@ -104,18 +105,16 @@ impl WgpuApp {
     ) -> anyhow::Result<()> {
         let instance_buffer = to_instance_buffer(&self.app_surface.device, instances.as_slice());
 
-        let mut datas = Vec::new();
-        let model = Arc::new(tokio::sync::Mutex::new(model));
+        let model = Arc::new(std::sync::Mutex::new(model));
         let instance_buffer = Arc::new(instance_buffer);
-        datas.push(UserDataType::ModelInstance(
+        let data = UserDataType::ModelInstance(
             model.clone(),
             0..instances.len() as u32,
             instance_buffer.clone(),
-        ));
+        );
 
         let mut entry_lock = self.user_data.lock().unwrap();
-        let entry = entry_lock.entry(name.to_string()).or_default();
-        *entry = datas;
+        entry_lock.insert(name.to_string(), data);
 
         self.models.push((model, instances));
         Ok(())
@@ -198,6 +197,7 @@ impl WgpuAppAction for WgpuApp {
             graph_resource,
             models,
             user_data,
+            timer: std::time::Duration::ZERO,
         };
 
         let arc_app = Arc::new(std::sync::Mutex::new(app));
@@ -229,6 +229,24 @@ impl WgpuAppAction for WgpuApp {
     fn update(&mut self, dt: std::time::Duration) {
         self.camera.controller.process_event(&self.controller);
         self.camera.update();
+        self.timer += dt;
+
+        let user_data = self.user_data.lock().unwrap();
+        if let Some(player) = user_data.get("player") {
+            match player {
+                UserDataType::ModelInstance(model, _range, _instance) => {
+                    let mut model = model.lock().unwrap();
+                    model.update_animation("SphereAction", self.timer);
+                    model.update_animation("Sphere.001Action", self.timer);
+                    model.update_animation("Sphere.002Action", self.timer);
+                    model.update_animation("Sphere.003Action", self.timer);
+                    model.update_animation("Sphere.004Action", self.timer);
+                    model.update_animation("Sphere.005Action", self.timer);
+                    }
+                _ => {}
+            }
+        }
+
         self.app_surface.queue.write_buffer(
             self.camera.buffer.as_ref().unwrap(),
             0,
@@ -286,7 +304,7 @@ impl WgpuAppAction for WgpuApp {
                 ..Default::default()
             });
 
-            for (data_tag, datas) in self.user_data.lock().unwrap().iter() {
+            for (data_tag, data) in self.user_data.lock().unwrap().iter() {
                 // println!("[Debug] {:?}({:?}) {data_tag:?}", file!(), line!());
 
                 let render_pipeline = self
@@ -297,27 +315,25 @@ impl WgpuAppAction for WgpuApp {
 
                 render_pass.set_pipeline(&render_pipeline);
 
-                for data in datas {
-                    match data {
-                        UserDataType::Model(model, instance_buffer) => {
-                            let model = &*model.blocking_lock();
-                            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                            render_pass.draw_model(
-                                &self.app_surface.queue,
-                                model,
-                                self.camera.bind_group.as_ref().unwrap(),
-                            );
-                        }
-                        UserDataType::ModelInstance(model, instances, instance_buffer) => {
-                            let model = &*model.blocking_lock();
-                            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-                            render_pass.draw_model_instanced(
-                                &self.app_surface.queue,
-                                model,
-                                instances.clone(),
-                                self.camera.bind_group.as_ref().unwrap(),
-                            );
-                        }
+                match data {
+                    UserDataType::Model(model, instance_buffer) => {
+                        let model = &*model.lock().unwrap();
+                        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+                        render_pass.draw_model(
+                            &self.app_surface.queue,
+                            model,
+                            self.camera.bind_group.as_ref().unwrap(),
+                        );
+                    }
+                    UserDataType::ModelInstance(model, instances, instance_buffer) => {
+                        let model = &*model.lock().unwrap();
+                        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+                        render_pass.draw_model_instanced(
+                            &self.app_surface.queue,
+                            model,
+                            instances.clone(),
+                            self.camera.bind_group.as_ref().unwrap(),
+                        );
                     }
                 }
             }

@@ -212,6 +212,7 @@ impl Animation {
     }
 
     pub fn get_transform(&self, time: f32) -> BoxResult<cgmath::Matrix4<f32>> {
+        // println!("time: {:?}, period: {:?}", time, self.period);
         let translation = self.get_translation_matrix(time);
         let rotation = self.get_rotation_matrix(time);
         let scale = self.get_scale_matrix(time);
@@ -228,7 +229,7 @@ pub struct Model {
 }
 
 impl Model {
-    fn update_animation(&mut self, action: &str, dt: std::time::Duration) {
+    pub fn update_animation(&mut self, action: &str, dt: std::time::Duration) {
         if let Some(animations) = self.animations.get(action) {
             for animation in animations {
                 if let Ok(transform) = animation.get_transform(dt.as_secs_f32()) {
