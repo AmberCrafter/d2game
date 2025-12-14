@@ -3,7 +3,6 @@ pub mod camera;
 pub mod config;
 pub mod instance;
 pub mod model;
-pub mod module;
 pub mod render_pipeline;
 pub mod resource;
 pub mod shader;
@@ -16,7 +15,7 @@ pub mod controller;
 use std::{
     collections::HashMap,
     ops::Range,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{Arc, Mutex},
 };
 
 use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
@@ -24,7 +23,16 @@ use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::engine::{
-    bindgroup::BindGroupInfo, camera::{CameraConfig, CameraInfo}, config::GraphConfig, controller::Controller, instance::{to_instance_buffer, Instance}, model::{DrawModel, Model}, module::WgpuAppModule, render_pipeline::RenderPipelineInfo, shader::ShaderInfo, texture::{Texture, TextureInfo}, vertex::VertexBufferInfo
+    bindgroup::BindGroupInfo,
+    camera::{CameraConfig, CameraInfo},
+    config::GraphConfig,
+    controller::Controller,
+    instance::{Instance, to_instance_buffer},
+    model::{DrawModel, Model},
+    render_pipeline::RenderPipelineInfo,
+    shader::ShaderInfo,
+    texture::{Texture, TextureInfo},
+    vertex::VertexBufferInfo,
 };
 
 type BoxResult<T> = anyhow::Result<T>;
@@ -57,40 +65,17 @@ pub struct WgpuApp {
     pub controller: Controller,
     pub camera: CameraInfo,
     pub graph_resource: WgpuAppGraphResource,
+    models: Vec<(Arc<tokio::sync::Mutex<Model>>, Vec<Instance>)>,
     pub user_data: Arc<Mutex<HashMap<String, Vec<UserDataType>>>>,
 }
 
-static APP_MODELS: LazyLock<
-    Mutex<HashMap<String, Box<dyn WgpuAppModule + 'static + Sync + Send>>>,
-> = LazyLock::new(|| Mutex::new(HashMap::new()));
+// static APP_MODELS: LazyLock<
+//     Mutex<HashMap<String, Box<dyn WgpuAppModule + 'static + Sync + Send>>>,
+// > = LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub fn registe_app_model(name: &str, module: Box<dyn WgpuAppModule + 'static + Sync + Send>) {
-    APP_MODELS.lock().unwrap().insert(name.to_string(), module);
-}
-
-pub fn register_model_instances(
-    name: &str,
-    app: &WgpuApp,
-    model: Model,
-    instances: &[Instance],
-) -> (Arc<tokio::sync::Mutex<Model>>, Arc<wgpu::Buffer>) {
-    let instance_buffer = to_instance_buffer(&app.app_surface.device, instances);
-
-    let mut datas = Vec::new();
-    let model = Arc::new(tokio::sync::Mutex::new(model));
-    let instance_buffer = Arc::new(instance_buffer);
-    datas.push(UserDataType::ModelInstance(
-        model.clone(),
-        0..instances.len() as u32,
-        instance_buffer.clone(),
-    ));
-
-    let mut entry_lock = app.user_data.lock().unwrap();
-    let entry = entry_lock.entry(name.to_string()).or_default();
-    *entry = datas;
-
-    (model, instance_buffer)
-}
+// pub fn registe_app_model(name: &str, module: Box<dyn WgpuAppModule + 'static + Sync + Send>) {
+//     APP_MODELS.lock().unwrap().insert(name.to_string(), module);
+// }
 
 impl WgpuApp {
     fn resize_surface_if_needed(&mut self) {
@@ -110,10 +95,35 @@ impl WgpuApp {
                 ));
         }
     }
+
+    pub fn register_model_instances(
+        &mut self,
+        name: &str,
+        model: Model,
+        instances: Vec<Instance>,
+    ) -> anyhow::Result<()> {
+        let instance_buffer = to_instance_buffer(&self.app_surface.device, instances.as_slice());
+
+        let mut datas = Vec::new();
+        let model = Arc::new(tokio::sync::Mutex::new(model));
+        let instance_buffer = Arc::new(instance_buffer);
+        datas.push(UserDataType::ModelInstance(
+            model.clone(),
+            0..instances.len() as u32,
+            instance_buffer.clone(),
+        ));
+
+        let mut entry_lock = self.user_data.lock().unwrap();
+        let entry = entry_lock.entry(name.to_string()).or_default();
+        *entry = datas;
+
+        self.models.push((model, instances));
+        Ok(())
+    }
 }
 
 impl WgpuAppAction for WgpuApp {
-    async fn new(window: std::sync::Arc<Window>) -> Arc<tokio::sync::Mutex<Self>> {
+    async fn new(window: std::sync::Arc<Window>) -> Arc<std::sync::Mutex<Self>> {
         let app_surface = AppSurface::new(window).await.unwrap();
 
         let graph_config = GraphConfig::new("./src/config/graph.toml");
@@ -176,6 +186,7 @@ impl WgpuAppAction for WgpuApp {
             render_pipeline_info,
         };
 
+        let models = Vec::new();
         let user_data = Arc::new(Mutex::new(HashMap::new()));
 
         let app = Self {
@@ -185,15 +196,11 @@ impl WgpuAppAction for WgpuApp {
             controller,
             camera,
             graph_resource,
+            models,
             user_data,
         };
 
-        let arc_app = Arc::new(tokio::sync::Mutex::new(app));
-        let mut module_lock = APP_MODELS.lock().unwrap();
-        for ele in module_lock.iter_mut() {
-            let _ = ele.1.probe(arc_app.clone()).await;
-        }
-
+        let arc_app = Arc::new(std::sync::Mutex::new(app));
         arc_app
     }
 
@@ -220,11 +227,6 @@ impl WgpuAppAction for WgpuApp {
     }
 
     fn update(&mut self, dt: std::time::Duration) {
-        let mut module_lock = APP_MODELS.lock().unwrap();
-        for ele in module_lock.iter_mut() {
-            let _ = ele.1.update(&self.app_surface.queue, dt);
-        }
-
         self.camera.controller.process_event(&self.controller);
         self.camera.update();
         self.app_surface.queue.write_buffer(

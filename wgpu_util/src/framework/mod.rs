@@ -15,9 +15,7 @@ use winit::{
 
 #[allow(unused)]
 pub trait WgpuAppAction {
-    fn new(
-        window: Arc<Window>,
-    ) -> impl core::future::Future<Output = Arc<tokio::sync::Mutex<Self>>>;
+    fn new(window: Arc<Window>) -> impl core::future::Future<Output = Arc<std::sync::Mutex<Self>>>;
     // fn new(window: Arc<Window>) -> Self;
     fn set_window_resized(&mut self, size: PhysicalSize<u32>);
     fn get_size(&self) -> PhysicalSize<u32>;
@@ -45,10 +43,11 @@ pub trait WgpuAppAction {
 }
 
 #[allow(unused)]
-struct WgpuAppHandler<A: WgpuAppAction> {
+pub struct WgpuAppHandler<A: WgpuAppAction> {
     title: String,
     window: Option<Arc<Window>>,
-    app: Option<Arc<tokio::sync::Mutex<A>>>,
+    app: Option<Arc<std::sync::Mutex<A>>>,
+    preload_resources: Vec<Box<dyn Fn(Arc<std::sync::Mutex<A>>) -> anyhow::Result<()>>>,
     last_render_time: std::time::Instant,
 }
 
@@ -59,8 +58,23 @@ impl<A: WgpuAppAction> WgpuAppHandler<A> {
             title: title.to_string(),
             window: None,
             app: None,
+            preload_resources: Vec::new(),
             last_render_time: std::time::Instant::now(),
         }
+    }
+
+    pub fn run(&mut self) -> anyhow::Result<()> {
+        let event_loop = EventLoop::new()?;
+        event_loop.run_app(self);
+        Ok(())
+    }
+
+    pub fn add_resource_loader(
+        &mut self,
+        cb: Box<dyn Fn(Arc<std::sync::Mutex<A>>) -> anyhow::Result<()>>,
+    ) -> anyhow::Result<()> {
+        self.preload_resources.push(cb);
+        Ok(())
     }
 
     fn config_window(&mut self, window: Arc<Window>) {
@@ -99,6 +113,11 @@ impl<A: WgpuAppAction> ApplicationHandler for WgpuAppHandler<A> {
         };
 
         let wgpu_app = rt.block_on(A::new(window.clone()));
+
+        for res in self.preload_resources.drain(..) {
+            res(wgpu_app.clone());
+        }
+
         self.app.replace(wgpu_app);
 
         self.config_window(window.clone());
@@ -115,13 +134,8 @@ impl<A: WgpuAppAction> ApplicationHandler for WgpuAppHandler<A> {
         window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        let Ok(rt) = tokio::runtime::Runtime::new() else {
-            error!("System Error");
-            return;
-        };
-
         let app_copy = self.app.clone().unwrap();
-        let mut app = rt.block_on(app_copy.lock());
+        let mut app = app_copy.lock().unwrap();
 
         match event {
             WindowEvent::CloseRequested => {
@@ -192,10 +206,8 @@ impl<A: WgpuAppAction> ApplicationHandler for WgpuAppHandler<A> {
 }
 
 #[allow(unused)]
-pub fn run<A: WgpuAppAction>(title: &str) -> anyhow::Result<()> {
+pub fn init<A: WgpuAppAction>(title: &str) -> anyhow::Result<WgpuAppHandler<A>> {
     logger::init_logger();
-    let event_loop = EventLoop::new()?;
     let mut app = WgpuAppHandler::<A>::new(title);
-    let _ = event_loop.run_app(&mut app);
-    Ok(())
+    Ok(app)
 }

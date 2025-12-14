@@ -302,7 +302,7 @@ impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> {
         }
 
         self.set_bind_group(0, material.get_bind_group(), &[]);
-        // self.set_bind_group(1, camera_bind_group, &[]);
+        self.set_bind_group(1, camera_bind_group, &[]);
         self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
 

@@ -2,6 +2,7 @@ use cgmath::Matrix4;
 use wgpu::util::DeviceExt;
 
 const SIZE_MAT4: usize = core::mem::size_of::<cgmath::Matrix4<f32>>();
+pub type InstanceBuffer = wgpu::Buffer;
 
 pub struct Instance {
     pub position: cgmath::Vector3<f32>,
