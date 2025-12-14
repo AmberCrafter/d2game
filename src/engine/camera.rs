@@ -1,6 +1,7 @@
 use cgmath::{Deg, InnerSpace, SquareMatrix};
 use wgpu::{Device, util::DeviceExt};
-use winit::event::KeyEvent;
+
+use crate::engine::controller::Controller;
 
 type Pos3 = cgmath::Point3<f32>;
 type Vec3 = cgmath::Vector3<f32>;
@@ -42,9 +43,7 @@ impl CameraUniform {
 
     pub fn as_bytes(&self) -> [u8; 80] {
         // unsafe { &(*(self.view_proj.as_ptr() as *const [u8; core::mem::size_of::<Mat4>()])) }
-        unsafe {
-            core::mem::transmute::<CameraUniform, [u8; 80]>(self.clone())
-        }
+        unsafe { core::mem::transmute::<CameraUniform, [u8; 80]>(self.clone()) }
     }
 }
 
@@ -57,6 +56,8 @@ pub struct CameraController {
     is_backward_press: bool,
     is_left_press: bool,
     is_right_press: bool,
+    is_turnleft_press: bool,
+    is_turnright_press: bool,
 }
 
 impl CameraController {
@@ -69,49 +70,63 @@ impl CameraController {
             is_backward_press: false,
             is_left_press: false,
             is_right_press: false,
+            is_turnleft_press: false,
+            is_turnright_press: false,
         }
     }
 
-    pub fn process_event(&mut self, event: &KeyEvent) -> bool {
-        match event {
-            KeyEvent {
-                state,
-                physical_key,
-                logical_key,
-                ..
-            } => match (logical_key, physical_key) {
-                (winit::keyboard::Key::Named(winit::keyboard::NamedKey::Space), _) => {
-                    self.is_up_press = state.is_pressed();
-                    true
-                }
-                (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::Space)) => {
-                    self.is_up_press = state.is_pressed();
-                    true
-                }
-                (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::ShiftLeft)) => {
-                    self.is_down_press = state.is_pressed();
-                    true
-                }
-                (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyW)) => {
-                    self.is_forwward_press = state.is_pressed();
-                    true
-                }
-                (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyS)) => {
-                    self.is_backward_press = state.is_pressed();
-                    true
-                }
-                (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyA)) => {
-                    self.is_left_press = state.is_pressed();
-                    true
-                }
-                (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyD)) => {
-                    self.is_right_press = state.is_pressed();
-                    true
-                }
-                _ => false,
-            },
-        }
+    pub fn process_event(&mut self, controller: &Controller) {
+        let state = controller.get_state();
+        self.is_forwward_press = state.forward;
+        self.is_backward_press = state.backward;
+        self.is_up_press = state.up;
+        self.is_down_press = state.down;
+        self.is_left_press = state.left;
+        self.is_right_press = state.right;
+        self.is_turnleft_press = state.turnleft;
+        self.is_turnright_press = state.turnright;
     }
+
+    // pub fn process_event_v1(&mut self, event: &KeyEvent) -> bool {
+    //     match event {
+    //         KeyEvent {
+    //             state,
+    //             physical_key,
+    //             logical_key,
+    //             ..
+    //         } => match (logical_key, physical_key) {
+    //             (winit::keyboard::Key::Named(winit::keyboard::NamedKey::Space), _) => {
+    //                 self.is_up_press = state.is_pressed();
+    //                 true
+    //             }
+    //             (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::Space)) => {
+    //                 self.is_up_press = state.is_pressed();
+    //                 true
+    //             }
+    //             (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::ShiftLeft)) => {
+    //                 self.is_down_press = state.is_pressed();
+    //                 true
+    //             }
+    //             (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyW)) => {
+    //                 self.is_forwward_press = state.is_pressed();
+    //                 true
+    //             }
+    //             (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyS)) => {
+    //                 self.is_backward_press = state.is_pressed();
+    //                 true
+    //             }
+    //             (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyA)) => {
+    //                 self.is_left_press = state.is_pressed();
+    //                 true
+    //             }
+    //             (_, winit::keyboard::PhysicalKey::Code(winit::keyboard::KeyCode::KeyD)) => {
+    //                 self.is_right_press = state.is_pressed();
+    //                 true
+    //             }
+    //             _ => false,
+    //         },
+    //     }
+    // }
 
     fn update_camera_config(&mut self, config: &mut CameraConfig) {
         let forward = config.target - config.eye;
@@ -128,20 +143,26 @@ impl CameraController {
 
         let right = forward_norm.cross(config.up);
 
-        // let forward = config.target - config.eye;
-        // let forward_mag = forward.magnitude();
-
         if self.is_left_press {
-            // config.eye = config.target - (forward - right * self.speed).normalize() * forward_mag;
             config.eye = config.eye - right * self.speed;
             config.target -= right * self.speed;
         }
 
         if self.is_right_press {
-            // config.eye = config.target - (forward + right * self.speed).normalize() * forward_mag;
             config.eye = config.eye + right * self.speed;
             config.target += right * self.speed;
         }
+
+
+        let forward = config.target - config.eye;
+        let forward_mag = forward.magnitude();
+        if self.is_turnleft_press {
+            config.eye = config.target - (forward - right * self.speed).normalize() * forward_mag;
+        }
+        if self.is_turnright_press {
+            config.eye = config.target - (forward + right * self.speed).normalize() * forward_mag;
+        }
+
     }
 }
 
@@ -158,7 +179,7 @@ pub struct CameraInfo {
 impl CameraInfo {
     pub fn new(config: CameraConfig) -> Self {
         let uniform = CameraUniform::new();
-        let controller = CameraController::new(0.1);
+        let controller = CameraController::new(0.4);
 
         Self {
             config,
