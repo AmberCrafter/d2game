@@ -11,6 +11,7 @@ pub mod texture;
 pub mod vertex;
 
 pub mod buffer;
+pub mod controller;
 
 use std::{
     collections::HashMap,
@@ -23,17 +24,10 @@ use wgpu_util::{framework::WgpuAppAction, hal::AppSurface};
 use winit::{dpi::PhysicalSize, window::Window};
 
 use crate::engine::{
-    bindgroup::BindGroupInfo,
-    camera::{CameraConfig, CameraInfo},
-    config::GraphConfig,
-    instance::{Instance, to_instance_buffer},
-    model::{DrawModel, Model},
-    module::WgpuAppModule,
-    render_pipeline::RenderPipelineInfo,
-    shader::ShaderInfo,
-    texture::{Texture, TextureInfo},
-    vertex::VertexBufferInfo,
+    bindgroup::BindGroupInfo, camera::{CameraConfig, CameraInfo}, config::GraphConfig, controller::Controller, instance::{to_instance_buffer, Instance}, model::{DrawModel, Model}, module::WgpuAppModule, render_pipeline::RenderPipelineInfo, shader::ShaderInfo, texture::{Texture, TextureInfo}, vertex::VertexBufferInfo
 };
+
+type BoxResult<T> = anyhow::Result<T>;
 
 #[allow(unused)]
 pub enum UserDataType {
@@ -60,6 +54,7 @@ pub struct WgpuApp {
     pub app_surface: AppSurface,
     pub size: PhysicalSize<u32>,
     pub size_changed: bool,
+    pub controller: Controller,
     pub camera: CameraInfo,
     pub graph_resource: WgpuAppGraphResource,
     pub user_data: Arc<Mutex<HashMap<String, Vec<UserDataType>>>>,
@@ -132,6 +127,8 @@ impl WgpuAppAction for WgpuApp {
             height: app_surface.config.height,
         };
 
+        let controller = Controller::new();
+
         // x: screen right
         // y: screen top
         // z: out of screen (to user)
@@ -185,6 +182,7 @@ impl WgpuAppAction for WgpuApp {
             app_surface,
             size,
             size_changed: false,
+            controller,
             camera,
             graph_resource,
             user_data,
@@ -215,7 +213,8 @@ impl WgpuAppAction for WgpuApp {
     }
 
     fn keyboard_input(&mut self, event: &winit::event::KeyEvent, _is_synthetic: bool) -> bool {
-        self.camera.controller.process_event(event)
+        self.controller.parse_key_event(event)
+        // self.camera.controller.process_event(event)
 
         // true
     }
@@ -226,6 +225,7 @@ impl WgpuAppAction for WgpuApp {
             let _ = ele.1.update(&self.app_surface.queue, dt);
         }
 
+        self.camera.controller.process_event(&self.controller);
         self.camera.update();
         self.app_surface.queue.write_buffer(
             self.camera.buffer.as_ref().unwrap(),
