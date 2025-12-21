@@ -1,7 +1,7 @@
 // mod background;
 mod engine;
 // mod item;
-mod player;
+// mod player;
 
 use crate::engine::WgpuApp;
 use wgpu_util::framework;
@@ -12,7 +12,7 @@ fn main() -> anyhow::Result<()> {
     // registe_app_model("background", Box::new(background::BackgroundModule::new()));
 
     let mut fw = framework::init::<WgpuApp>("MyGame")?;
-    fw.add_resource_loader(Box::new(player::load_resource))?;
+    // fw.add_resource_loader(Box::new(player::load_resource))?;
     fw.run().unwrap();
     Ok(())
 }

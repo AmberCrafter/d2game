@@ -3,8 +3,8 @@ pub struct Material {
     pub base_color_factor: [f32; 4],
     pub base_color_texture_index: Option<usize>,
     pub normal_texture_index: Option<usize>,
-    pub metallic_factor: f32,
-    pub roughness_factor: f32,
+    pub metallic_factor: [f32; 1],
+    pub roughness_factor: [f32; 1],
     pub metallic_roughness_texture_index: Option<usize>,
     pub occlusion_texture_index: Option<usize>,
     pub emissive_factor: [f32; 3],
@@ -19,8 +19,8 @@ impl From<gltf::material::Material<'_>> for Material {
         let base_color_factor = pbr.base_color_factor();
         let base_color_texture_index = pbr.base_color_texture().map(|val| val.texture().index());
         let normal_texture_index = value.normal_texture().map(|val| val.texture().index());
-        let metallic_factor = pbr.metallic_factor();
-        let roughness_factor = pbr.roughness_factor();
+        let metallic_factor = [pbr.metallic_factor()];
+        let roughness_factor = [pbr.roughness_factor()];
         let metallic_roughness_texture_index = pbr
             .metallic_roughness_texture()
             .map(|val| val.texture().index());

@@ -20,6 +20,7 @@ impl TextureInfo {
 #[allow(unused)]
 #[derive(Debug)]
 pub struct Texture {
+    pub name: Option<String>,
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
@@ -94,6 +95,7 @@ impl Texture {
             view_formats: &[],
         });
 
+        println!("{label:?}: format: {:?}", texture.format());
         let pixel_byte = Self::single_pixel_bytes(texture.format());
 
         queue.write_texture(
@@ -112,6 +114,7 @@ impl Texture {
             texture_size,
         );
 
+        println!("[Debug] {:?}({:?})", file!(), line!());
         let texture_view = texture.create_view(&wgpu::wgt::TextureViewDescriptor {
             // format: Some(format.remove_srgb_suffix()),
             ..Default::default()
@@ -127,6 +130,7 @@ impl Texture {
         });
 
         Ok(Self {
+            name: label.map(|val| val.to_string()),
             texture,
             view: texture_view,
             sampler: texture_sampler,
@@ -164,6 +168,7 @@ impl Texture {
             view_formats: &[],
         });
 
+        println!("[Debug] {:?}({:?})", file!(), line!());
         let view = texture.create_view(&wgpu::wgt::TextureViewDescriptor {
             // format: Some(format.remove_srgb_suffix()),
             ..Default::default()
@@ -182,6 +187,7 @@ impl Texture {
         });
 
         Self {
+            name: Some("depth texture".to_string()),
             texture,
             view,
             sampler,
@@ -241,6 +247,7 @@ impl Texture {
             texture_size,
         );
 
+        println!("[Debug] {:?}({:?})", file!(), line!());
         let texture_view = texture.create_view(&wgpu::wgt::TextureViewDescriptor {
             // format: Some(format.remove_srgb_suffix()),
             ..Default::default()
@@ -283,6 +290,7 @@ impl Texture {
         });
 
         Ok(Self {
+            name: label.map(|val| val.to_string()),
             texture,
             view: texture_view,
             sampler: texture_sampler,

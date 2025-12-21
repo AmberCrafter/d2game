@@ -1,7 +1,9 @@
+use winit::window::ResizeDirection;
+
 #[derive(Debug)]
 pub struct Mesh {
     pub name: Option<String>,
-    pub primatives: Vec<Primative>,
+    pub primitives: Vec<Primitive>,
 }
 
 impl Mesh {
@@ -10,17 +12,17 @@ impl Mesh {
         buffers: &Vec<Vec<u8>>,
     ) -> Result<Self, Box<dyn std::error::Error + 'static>> {
         let name = mesh.name().map(|val| val.to_string());
-        let mut primatives = Vec::new();
+        let mut primitives = Vec::new();
         for primative in mesh.primitives() {
-            primatives.push(Primative::parse(&primative, buffers)?);
+            primitives.push(Primitive::parse(&primative, buffers)?);
         }
 
-        Ok(Self { name, primatives })
+        Ok(Self { name, primitives })
     }
 }
 
 #[derive(Debug)]
-pub struct Primative {
+pub struct Primitive {
     pub positions: Vec<[f32; 3]>,
     pub tex_coords: Vec<[f32; 2]>,
     pub normals: Vec<[f32; 3]>,
@@ -28,7 +30,7 @@ pub struct Primative {
     pub material: usize,
 }
 
-impl Primative {
+impl Primitive {
     pub fn parse(
         primative: &gltf::mesh::Primitive<'_>,
         buffers: &Vec<Vec<u8>>,

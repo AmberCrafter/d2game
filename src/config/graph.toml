@@ -131,3 +131,9 @@ shader = "player_gltf"
 depth_texture = true
 vertex_buffer_layouts = ["vertex", "instance"]
 bind_group_layouts = ["player_gltf_texture", "camera", "player_transform"]
+
+[pipelines.default]
+shader = "player_gltf"
+depth_texture = true
+vertex_buffer_layouts = ["vertex", "instance"]
+bind_group_layouts = ["player_gltf_texture", "camera", "player_transform"]

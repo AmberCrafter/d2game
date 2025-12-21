@@ -1,7 +1,8 @@
 use cgmath::{Deg, InnerSpace, SquareMatrix};
 use wgpu::{Device, util::DeviceExt};
+use wgpu_util::hal::AppSurface;
 
-use crate::engine::controller::Controller;
+use crate::engine::{WgpuAppGraphResource, controller::Controller};
 
 type Pos3 = cgmath::Point3<f32>;
 type Vec3 = cgmath::Vector3<f32>;
@@ -153,7 +154,6 @@ impl CameraController {
             config.target += right * self.speed;
         }
 
-
         let forward = config.target - config.eye;
         let forward_mag = forward.magnitude();
         if self.is_turnleft_press {
@@ -162,7 +162,6 @@ impl CameraController {
         if self.is_turnright_press {
             config.eye = config.target - (forward + right * self.speed).normalize() * forward_mag;
         }
-
     }
 }
 
@@ -249,5 +248,28 @@ impl CameraInfo {
     pub fn update(&mut self) {
         self.controller.update_camera_config(&mut self.config);
         self.update_view();
+    }
+}
+
+pub struct Camera {
+    pub info: CameraInfo,
+}
+
+impl Camera {
+    // TODO: from config.pipeline
+    pub const BindGroup_Index: u32 = 1;
+
+    pub fn new(
+        app_surface: &AppSurface,
+        graph_resource: &WgpuAppGraphResource,
+        config: CameraConfig,
+    ) -> Self {
+        let mut camera_info = CameraInfo::new(config);
+        let layout = graph_resource.bind_group_info.get("camera").unwrap();
+
+        camera_info.update_view();
+        camera_info.setup(&app_surface.device, layout);
+
+        Self { info: camera_info }
     }
 }
