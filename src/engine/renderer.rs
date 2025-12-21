@@ -17,6 +17,7 @@ pub struct Renderer {
     pub scene: Scene,
 }
 
+#[allow(unused)]
 impl Renderer {
     pub fn new(app_surface: &AppSurface, graph_resource: &WgpuAppGraphResource) -> Self {
         // x: screen right

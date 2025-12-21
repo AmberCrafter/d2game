@@ -11,6 +11,7 @@ pub struct Model {
     pub materials: Vec<Material>,
 }
 
+#[allow(unused)]
 impl Model {
     pub fn new(
         meshes: Vec<Mesh>,
@@ -41,22 +42,22 @@ impl Model {
                     // material
                     let material = &self.materials[primative.material_index];
                     render_pass.set_bind_group(
-                        Material::BindGroup_Index,
+                        Material::BIND_GROUP_INDEX,
                         &material.bind_group,
                         &[],
                     );
 
                     // Vertex
                     render_pass.set_vertex_buffer(
-                        Primitive::Position_Location,
+                        Primitive::POSITION_LOCATION,
                         primative.positions.slice(..),
                     );
                     render_pass.set_vertex_buffer(
-                        Primitive::TexCoords_Location,
+                        Primitive::TEX_COORDS_LOCATION,
                         primative.tex_coords.slice(..),
                     );
                     render_pass
-                        .set_vertex_buffer(Primitive::Normal_Location, primative.normals.slice(..));
+                        .set_vertex_buffer(Primitive::NORMAL_LOCATION, primative.normals.slice(..));
 
                     // Indices
                     render_pass

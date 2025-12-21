@@ -6,6 +6,7 @@ pub struct Scene {
     pub camera: Camera,
 }
 
+#[allow(unused)]
 impl Scene {
     pub fn new(camera: Camera) -> Self {
         Self {
@@ -29,7 +30,7 @@ impl Scene {
 
     pub fn render<'a>(&self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_bind_group(
-            Camera::BindGroup_Index,
+            Camera::BIND_GROUP_INDEX,
             &self.camera.info.bind_group,
             &[],
         );

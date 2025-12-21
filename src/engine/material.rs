@@ -2,6 +2,7 @@ use wgpu::util::DeviceExt;
 
 use crate::engine::{config::BindGroupConfig, resources, texture::Texture};
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Material {
     pub name: Option<String>,
@@ -9,14 +10,16 @@ pub struct Material {
     pub bind_group: wgpu::BindGroup,
 }
 
-enum Material_Entry<'a> {
+#[allow(unused)]
+enum MaterialEntry<'a> {
     Buffer(wgpu::Buffer),
     TextureView(&'a wgpu::TextureView),
     TextureSmapler(&'a wgpu::Sampler),
 }
 
-impl<'a> Material_Entry<'a> {
-    const TextureFormat: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+#[allow(unused)]
+impl<'a> MaterialEntry<'a> {
+    // const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
     fn to_buffer(
         device: &wgpu::Device,
@@ -43,8 +46,10 @@ impl<'a> Material_Entry<'a> {
 }
 
 // GLTF Material
+#[allow(unused)]
 impl Material {
-    pub const BindGroup_Index: u32 = 0;
+    // TODO: from config.pipeline
+    pub const BIND_GROUP_INDEX: u32 = 0;
 
     pub fn new(
         material: &resources::Material,
@@ -63,21 +68,21 @@ impl Material {
                     let label = Some(format!("Material base color factor"));
                     let data = bytemuck::cast_slice(&material.base_color_factor);
                     let usage = wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST;
-                    Material_Entry::to_buffer(device, label.as_deref(), data, usage)
+                    MaterialEntry::to_buffer(device, label.as_deref(), data, usage)
                 }
                 1 => {
                     // metallic factor
                     let label = Some(format!("Material metallic factor"));
                     let data = bytemuck::cast_slice(&material.metallic_factor);
                     let usage = wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST;
-                    Material_Entry::to_buffer(device, label.as_deref(), data, usage)
+                    MaterialEntry::to_buffer(device, label.as_deref(), data, usage)
                 }
                 2 => {
                     // roughness factor
                     let label = Some(format!("Material roughness factor"));
                     let data = bytemuck::cast_slice(&material.roughness_factor);
                     let usage = wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST;
-                    Material_Entry::to_buffer(device, label.as_deref(), data, usage)
+                    MaterialEntry::to_buffer(device, label.as_deref(), data, usage)
                 }
                 3 => {
                     // base color texture
@@ -87,7 +92,7 @@ impl Material {
                         .base_color_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_view(texture)
+                    MaterialEntry::to_texture_view(texture)
                 }
                 4 => {
                     // base color sampler
@@ -96,7 +101,7 @@ impl Material {
                         .base_color_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_sampler(texture)
+                    MaterialEntry::to_texture_sampler(texture)
                 }
                 5 => {
                     // metallic roughness texture
@@ -106,7 +111,7 @@ impl Material {
                         .metallic_roughness_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_view(texture)
+                    MaterialEntry::to_texture_view(texture)
                 }
                 6 => {
                     // metallic roughness sampler
@@ -115,7 +120,7 @@ impl Material {
                         .base_color_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_sampler(texture)
+                    MaterialEntry::to_texture_sampler(texture)
                 }
                 7 => {
                     // normal texture
@@ -125,7 +130,7 @@ impl Material {
                         .normal_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_view(texture)
+                    MaterialEntry::to_texture_view(texture)
                 }
                 8 => {
                     // normal sampler
@@ -134,7 +139,7 @@ impl Material {
                         .normal_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_sampler(texture)
+                    MaterialEntry::to_texture_sampler(texture)
                 }
                 9 => {
                     // occlusion texture
@@ -144,7 +149,7 @@ impl Material {
                         .occlusion_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_view(texture)
+                    MaterialEntry::to_texture_view(texture)
                 }
                 10 => {
                     // occlusion sampler
@@ -153,14 +158,14 @@ impl Material {
                         .occlusion_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_sampler(texture)
+                    MaterialEntry::to_texture_sampler(texture)
                 }
                 11 => {
                     // emissive factor
                     let label = Some(format!("Material emissive factor"));
                     let data = bytemuck::cast_slice(&material.emissive_factor);
                     let usage = wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST;
-                    Material_Entry::to_buffer(device, label.as_deref(), data, usage)
+                    MaterialEntry::to_buffer(device, label.as_deref(), data, usage)
                 }
                 12 => {
                     // emissive texture
@@ -170,7 +175,7 @@ impl Material {
                         .emissive_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_view(texture)
+                    MaterialEntry::to_texture_view(texture)
                 }
                 13 => {
                     // emissive sampler
@@ -179,9 +184,8 @@ impl Material {
                         .emissive_texture_index
                         .map(|idx| &textures[idx])
                         .unwrap();
-                    Material_Entry::to_texture_sampler(texture)
+                    MaterialEntry::to_texture_sampler(texture)
                 }
-
 
                 _ => {
                     unimplemented!()
@@ -194,15 +198,15 @@ impl Material {
         let entries = buffers
             .iter()
             .map(|(idx, buffer)| match buffer {
-                Material_Entry::Buffer(buffer) => wgpu::BindGroupEntry {
+                MaterialEntry::Buffer(buffer) => wgpu::BindGroupEntry {
                     binding: *idx,
                     resource: buffer.as_entire_binding(),
                 },
-                Material_Entry::TextureView(view) => wgpu::BindGroupEntry {
+                MaterialEntry::TextureView(view) => wgpu::BindGroupEntry {
                     binding: *idx,
                     resource: wgpu::BindingResource::TextureView(*view),
                 },
-                Material_Entry::TextureSmapler(sampler) => wgpu::BindGroupEntry {
+                MaterialEntry::TextureSmapler(sampler) => wgpu::BindGroupEntry {
                     binding: *idx,
                     resource: wgpu::BindingResource::Sampler(*sampler),
                 },

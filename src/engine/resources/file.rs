@@ -1,6 +1,7 @@
 use std::error::Error;
 
 // TODO: fix url base on live server and normal web server
+#[allow(unused)]
 #[cfg(target_arch = "wasm32")]
 fn format_url(file_name: &str) -> reqwest::Url {
     let window = web_sys::window().unwrap();
@@ -17,6 +18,7 @@ fn format_url(file_name: &str) -> reqwest::Url {
 
 
 
+#[allow(unused)]
 #[cfg(target_arch = "wasm32")]
 pub async fn load_string(file_name: &str) -> Result<String, Box<dyn Error + 'static>>
 {
@@ -25,6 +27,7 @@ pub async fn load_string(file_name: &str) -> Result<String, Box<dyn Error + 'sta
     Ok(txt)
 }
     
+#[allow(unused)]
 #[cfg(not(target_arch = "wasm32"))]
 pub fn load_string(file_name: &str) -> Result<String, Box<dyn Error + 'static>>
 {
@@ -37,6 +40,7 @@ pub fn load_string(file_name: &str) -> Result<String, Box<dyn Error + 'static>>
 
 
 
+#[allow(unused)]
 #[cfg(target_arch = "wasm32")]
 pub async fn load_binary(file_name: &str) -> Result<Vec<u8>, Box<dyn Error + 'static>>
 {
@@ -45,6 +49,7 @@ pub async fn load_binary(file_name: &str) -> Result<Vec<u8>, Box<dyn Error + 'st
     Ok(data)
 }
 
+#[allow(unused)]
 #[cfg(not(target_arch = "wasm32"))]
 pub fn load_binary(file_name: &str) -> Result<Vec<u8>, Box<dyn Error + 'static>>
 {

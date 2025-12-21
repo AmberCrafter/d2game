@@ -2,12 +2,14 @@ use wgpu::util::DeviceExt;
 
 use crate::engine::resources;
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Mesh {
     pub name: Option<String>,
     pub primitives: Vec<Primitive>,
 }
 
+#[allow(unused)]
 impl Mesh {
     pub fn new(mesh: &resources::Mesh, device: &wgpu::Device) -> Self {
         let mut primitives = Vec::new();
@@ -41,9 +43,9 @@ pub struct Primitive {
 }
 
 impl Primitive {
-    pub const Position_Location: u32 = 0;
-    pub const TexCoords_Location: u32 = 1;
-    pub const Normal_Location: u32 = 2;
+    pub const POSITION_LOCATION: u32 = 0;
+    pub const TEX_COORDS_LOCATION: u32 = 1;
+    pub const NORMAL_LOCATION: u32 = 2;
 
     pub fn new(primative: &resources::Primitive, label: &str, device: &wgpu::Device) -> Self {
         let positions = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

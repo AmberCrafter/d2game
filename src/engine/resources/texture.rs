@@ -1,5 +1,6 @@
 use gltf::texture::{MagFilter, MinFilter, WrappingMode};
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Sampler {
     pub mag_filter: Option<MagFilter>,
@@ -19,6 +20,7 @@ impl From<gltf::texture::Sampler<'_>> for Sampler {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Texture {
     pub name: Option<String>,

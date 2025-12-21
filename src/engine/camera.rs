@@ -61,6 +61,7 @@ pub struct CameraController {
     is_turnright_press: bool,
 }
 
+#[allow(unused)]
 impl CameraController {
     fn new(speed: f32) -> Self {
         Self {
@@ -165,6 +166,7 @@ impl CameraController {
     }
 }
 
+#[allow(unused)]
 pub struct CameraInfo {
     config: CameraConfig,
     pub uniform: CameraUniform,
@@ -175,6 +177,7 @@ pub struct CameraInfo {
     pub controller: CameraController,
 }
 
+#[allow(unused)]
 impl CameraInfo {
     pub fn new(config: CameraConfig) -> Self {
         let uniform = CameraUniform::new();
@@ -257,7 +260,7 @@ pub struct Camera {
 
 impl Camera {
     // TODO: from config.pipeline
-    pub const BindGroup_Index: u32 = 1;
+    pub const BIND_GROUP_INDEX: u32 = 1;
 
     pub fn new(
         app_surface: &AppSurface,

@@ -21,6 +21,7 @@ pub type Image = image::RgbaImage;
 
 pub type Buffer = Vec<u8>;
 
+#[allow(unused)]
 pub struct Resource {
     pub name: Option<String>,
     pub scenes: Vec<Scene>,
@@ -35,6 +36,7 @@ pub struct Resource {
 }
 
 // TODO: support wasm
+#[allow(unused)]
 impl Resource {
     pub fn load_gltf(file_name: &str) -> Result<Self, Box<dyn std::error::Error + 'static>> {
         let binary = load_binary(file_name)?;

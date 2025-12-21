@@ -1,5 +1,6 @@
 use crate::engine::resources;
 
+#[allow(unused)]
 pub struct Entity {
     pub name: Option<String>,
     pub mesh_index: Option<usize>,

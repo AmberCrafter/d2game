@@ -1,8 +1,6 @@
-use std::collections::VecDeque;
-
 use winit::event::KeyEvent;
 
-
+#[allow(unused)]
 #[derive(Debug)]
 pub enum Key {
     Forward,
@@ -15,12 +13,14 @@ pub enum Key {
     TurnRight,
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub enum KeyState {
     Press,
     Release,
 }
 
+#[allow(unused)]
 #[derive(Debug, Default)]
 pub struct ControllerKey {
     pub forward: bool,
@@ -35,12 +35,14 @@ pub struct ControllerKey {
 
 // type KeyCmd = (Key, KeyState);
 
+#[allow(unused)]
 #[derive(Debug, Default)]
 pub struct Controller {
     // commands: VecDeque<KeyCmd>,
     keys: ControllerKey,
 }
 
+#[allow(unused)]
 impl Controller {
     pub fn new() -> Self {
         Self::default()
@@ -69,6 +71,7 @@ impl Controller {
     }
 }
 
+#[allow(unused)]
 impl Controller {
     pub fn parse_key_event(&mut self, event: &KeyEvent) -> bool {
         match event {

@@ -33,8 +33,6 @@ use crate::engine::{
     vertex::VertexBufferInfo,
 };
 
-type BoxResult<T> = anyhow::Result<T>;
-
 #[allow(unused)]
 pub struct WgpuAppGraphResource {
     pub graph_config: GraphConfig,

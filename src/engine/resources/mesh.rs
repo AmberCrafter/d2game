@@ -1,5 +1,4 @@
-use winit::window::ResizeDirection;
-
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Mesh {
     pub name: Option<String>,
@@ -21,6 +20,7 @@ impl Mesh {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Primitive {
     pub positions: Vec<[f32; 3]>,
